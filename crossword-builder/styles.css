@@ -23,8 +23,92 @@ h1 {
 
 .main-content {
     display: flex;
-    gap: 40px;
+    gap: 20px;
     align-items: flex-start;
+}
+
+.clues-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    width: 300px;
+    max-height: 600px;
+}
+
+.clue-section {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 15px;
+}
+
+.clue-section h3 {
+    margin: 0 0 10px 0;
+    color: #495057;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.clue-list {
+    max-height: 250px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.clue-item {
+    padding: 8px 12px;
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.clue-item:hover {
+    background: #e3f2fd;
+    border-color: #2196f3;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(33, 150, 243, 0.2);
+}
+
+.clue-item.solved {
+    background: #f5f5f5;
+    border-color: #ccc;
+    color: #666;
+}
+
+.clue-item.solved .clue-number {
+    color: #999;
+}
+
+.clue-item.solved .clue-text {
+    color: #666;
+}
+
+.clue-answer {
+    color: #333;
+    font-weight: bold;
+    margin-left: 8px;
+}
+
+.clue-item .clue-number {
+    font-weight: bold;
+    color: #666;
+    margin-right: 8px;
+}
+
+.clue-item .clue-text {
+    color: #333;
+}
+
+.clue-item .clue-length {
+    color: #666;
+    font-size: 12px;
+    margin-top: 4px;
 }
 
 .grid-container {
