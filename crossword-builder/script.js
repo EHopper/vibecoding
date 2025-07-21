@@ -5,7 +5,6 @@ class CrosswordBuilder {
         this.placedWords = [];
         this.selectedWord = null;
         this.clues = { across: [], down: [] };
-        this.answers = { across: [], down: [] };
         this.solvedClues = new Set();
         
         this.init();
@@ -22,6 +21,7 @@ class CrosswordBuilder {
     createGrid() {
         console.log('Creating grid...');
         const gridElement = document.getElementById('crossword-grid');
+        gridElement.innerHTML = '';
         
         for (let row = 0; row < this.gridSize; row++) {
             this.grid[row] = [];
@@ -42,232 +42,27 @@ class CrosswordBuilder {
                 };
             }
         }
-        console.log('Grid created with', this.gridSize * this.gridSize, 'cells');
+        // Log the number of cells created
+        const cellCount = gridElement.querySelectorAll('.cell').length;
+        console.log('Grid created with', cellCount, 'cells');
     }
     
-    loadWords() {
-        console.log('Loading words...');
-        // Sample data from grid1.txt
-        const acrossWords = [
-            { number: 1, word: 'HAS' },
-            { number: 4, word: 'OCT' },
-            { number: 7, word: 'ALOFT' },
-            { number: 12, word: 'AIM' },
-            { number: 13, word: 'BOO' },
-            { number: 14, word: 'GENRE' },
-            { number: 15, word: 'TRANSOM' },
-            { number: 17, word: 'RACED' },
-            { number: 18, word: 'LIE' },
-            { number: 19, word: 'RESETS' },
-            { number: 20, word: 'WALL STREET' },
-            { number: 24, word: 'ARE' },
-            { number: 25, word: 'SEEPS' },
-            { number: 26, word: 'HOG' },
-            { number: 29, word: 'SIS' },
-            { number: 30, word: 'RIO' },
-            { number: 31, word: 'ALL' },
-            { number: 32, word: 'PAT' },
-            { number: 33, word: 'TENSE' },
-            { number: 35, word: 'CEE' },
-            { number: 36, word: 'POSSESSION' },
-            { number: 38, word: 'MEDUSA' },
-            { number: 41, word: 'TIE' },
-            { number: 42, word: 'OVALS' },
-            { number: 43, word: 'STERNER' },
-            { number: 47, word: 'SENSE' },
-            { number: 48, word: 'HEE' },
-            { number: 49, word: 'DEB' },
-            { number: 50, word: 'TREES' },
-            { number: 51, word: 'YAM' },
-            { number: 52, word: 'ALI' }
-        ];
-        
-        const downWords = [
-            { number: 1, word: 'HAT' },
-            { number: 2, word: 'AIR' },
-            { number: 3, word: 'SMALLEST' },
-            { number: 4, word: 'OBSESS' },
-            { number: 5, word: 'COO' },
-            { number: 6, word: 'TOM' },
-            { number: 7, word: 'AGREES' },
-            { number: 8, word: 'LEAST' },
-            { number: 9, word: 'ONCE' },
-            { number: 10, word: 'FRET' },
-            { number: 11, word: 'TEDS' },
-            { number: 16, word: 'NIL' },
-            { number: 19, word: 'REPOSE' },
-            { number: 20, word: 'WASP' },
-            { number: 21, word: 'ARIA' },
-            { number: 22, word: 'TERESA' },
-            { number: 23, word: 'REINS' },
-            { number: 26, word: 'HACIENDA' },
-            { number: 26, word: 'OLEO' },
-            { number: 28, word: 'GLEN' },
-            { number: 33, word: 'TOSSES' },
-            { number: 34, word: 'ESTEEM' },
-            { number: 36, word: 'PULSE' },
-            { number: 37, word: 'SIR' },
-            { number: 38, word: 'MOST' },
-            { number: 39, word: 'EVER' },
-            { number: 40, word: 'DANE' },
-            { number: 43, word: 'SHY' },
-            { number: 44, word: 'TEA' },
-            { number: 45, word: 'EEL' },
-            { number: 46, word: 'RBI' }
-        ];
-        
-        this.renderWordList('across-words', acrossWords);
-        this.renderWordList('down-words', downWords);
-        console.log('Words loaded:', acrossWords.length, 'across,', downWords.length, 'down');
-    }
+    async loadClues() {
+        console.log('Loading clues from input.json...');
+        try {
+            const response = await fetch('input.json');
+            const data = await response.json();
 
-    loadClues() {
-        console.log('Loading clues...');
-        
-        // Clues from clues1.txt
-        const acrossClues = [
-            { number: 1, clue: 'Contains', length: 3 },
-            { number: 4, clue: 'Fall mo.', length: 3 },
-            { number: 7, clue: 'Airborn', length: 5 },
-            { number: 12, clue: 'Ambition', length: 3 },
-            { number: 13, clue: 'Halloween shout', length: 3 },
-            { number: 14, clue: 'Kind', length: 5 },
-            { number: 15, clue: 'Window above a door', length: 8 },
-            { number: 17, clue: 'Rushed', length: 5 },
-            { number: 18, clue: 'Falsehood', length: 3 },
-            { number: 19, clue: 'Adjusts again', length: 6 },
-            { number: 20, clue: 'NYC financial district', length: 10 },
-            { number: 24, clue: 'Live', length: 3 },
-            { number: 25, clue: 'Oozes', length: 5 },
-            { number: 26, clue: 'Swine', length: 3 },
-            { number: 29, clue: 'Family mem.', length: 3 },
-            { number: 30, clue: '___ de Janiero', length: 3 },
-            { number: 31, clue: '100%', length: 3 },
-            { number: 32, clue: 'Touch lightly', length: 3 },
-            { number: 33, clue: 'High-strung', length: 5 },
-            { number: 35, clue: 'So-so grade', length: 3 },
-            { number: 36, clue: 'Ownership', length: 10 },
-            { number: 38, clue: 'Snake-haired woman', length: 6 },
-            { number: 41, clue: 'Ascot', length: 3 },
-            { number: 42, clue: 'Track shapes', length: 5 },
-            { number: 43, clue: 'Stricter', length: 7 },
-            { number: 47, clue: 'Perceive', length: 5 },
-            { number: 48, clue: 'Laughter syllable', length: 3 },
-            { number: 49, clue: 'Society gal', length: 3 },
-            { number: 50, clue: "Squirrels' homes", length: 5 },
-            { number: 51, clue: 'Sweet potato', length: 3 },
-            { number: 52, clue: 'Muhammad ___', length: 3 }
-        ];
-        
-        const downClues = [
-            { number: 1, clue: 'Bonnet', length: 3 },
-            { number: 2, clue: 'Atmosphere', length: 3 },
-            { number: 3, clue: 'Littlest', length: 8 },
-            { number: 4, clue: 'Preoccupy', length: 6 },
-            { number: 5, clue: "Dove's comment", length: 3 },
-            { number: 6, clue: '___ Cruise', length: 3 },
-            { number: 7, clue: 'Concurs', length: 6 },
-            { number: 8, clue: 'Slightest', length: 5 },
-            { number: 9, clue: 'Fairy tale starter', length: 4 },
-            { number: 10, clue: 'Worry', length: 4 },
-            { number: 11, clue: 'Turner and Kennedy', length: 4 },
-            { number: 16, clue: 'Naught', length: 3 },
-            { number: 19, clue: 'Repose', length: 6 },
-            { number: 20, clue: "Hornet's kin", length: 4 },
-            { number: 21, clue: 'Opera tune', length: 4 },
-            { number: 22, clue: "Calcullta's Mother", length: 6 },
-            { number: 23, clue: 'Bridle straps', length: 5 },
-            { number: 26, clue: 'Spanish ranch', length: 8 },
-            { number: 26, clue: 'Toast topping', length: 4 },
-            { number: 28, clue: 'Singer ___ Campbell', length: 4 },
-            { number: 33, clue: 'Hurls', length: 6 },
-            { number: 34, clue: 'Regard highly', length: 6 },
-            { number: 36, clue: 'Throb', length: 5 },
-            { number: 37, clue: 'Respectful title', length: 3 },
-            { number: 38, clue: 'Majority', length: 4 },
-            { number: 39, clue: 'Always', length: 4 },
-            { number: 40, clue: 'A Scandinavian', length: 4 },
-            { number: 43, clue: 'Bashful', length: 3 },
-            { number: 44, clue: 'Boston ___ Party', length: 3 },
-            { number: 45, clue: 'Lamprey', length: 3 },
-            { number: 46, clue: 'Baseball stat', length: 3 }
-        ];
-        
-        this.clues.across = acrossClues;
-        this.clues.down = downClues;
-        
-        // Answers from grid1.txt
-        this.answers.across = [
-            { number: 1, word: 'HAS' },
-            { number: 4, word: 'OCT' },
-            { number: 7, word: 'ALOFT' },
-            { number: 12, word: 'AIM' },
-            { number: 13, word: 'BOO' },
-            { number: 14, word: 'GENRE' },
-            { number: 15, word: 'TRANSOM' },
-            { number: 17, word: 'RACED' },
-            { number: 18, word: 'LIE' },
-            { number: 19, word: 'RESETS' },
-            { number: 20, word: 'WALL STREET' },
-            { number: 24, word: 'ARE' },
-            { number: 25, word: 'SEEPS' },
-            { number: 26, word: 'HOG' },
-            { number: 29, word: 'SIS' },
-            { number: 30, word: 'RIO' },
-            { number: 31, word: 'ALL' },
-            { number: 32, word: 'PAT' },
-            { number: 33, word: 'TENSE' },
-            { number: 35, word: 'CEE' },
-            { number: 36, word: 'POSSESSION' },
-            { number: 38, word: 'MEDUSA' },
-            { number: 41, word: 'TIE' },
-            { number: 42, word: 'OVALS' },
-            { number: 43, word: 'STERNER' },
-            { number: 47, word: 'SENSE' },
-            { number: 48, word: 'HEE' },
-            { number: 49, word: 'DEB' },
-            { number: 50, word: 'TREES' },
-            { number: 51, word: 'YAM' },
-            { number: 52, word: 'ALI' }
-        ];
-        
-        this.answers.down = [
-            { number: 1, word: 'HAT' },
-            { number: 2, word: 'AIR' },
-            { number: 3, word: 'SMALLEST' },
-            { number: 4, word: 'OBSESS' },
-            { number: 5, word: 'COO' },
-            { number: 6, word: 'TOM' },
-            { number: 7, word: 'AGREES' },
-            { number: 8, word: 'LEAST' },
-            { number: 9, word: 'ONCE' },
-            { number: 10, word: 'FRET' },
-            { number: 11, word: 'TEDS' },
-            { number: 16, word: 'NIL' },
-            { number: 19, word: 'REPOSE' },
-            { number: 20, word: 'WASP' },
-            { number: 21, word: 'ARIA' },
-            { number: 22, word: 'TERESA' },
-            { number: 23, word: 'REINS' },
-            { number: 26, word: 'HACIENDA' },
-            { number: 26, word: 'OLEO' },
-            { number: 28, word: 'GLEN' },
-            { number: 33, word: 'TOSSES' },
-            { number: 34, word: 'ESTEEM' },
-            { number: 36, word: 'PULSE' },
-            { number: 37, word: 'SIR' },
-            { number: 38, word: 'MOST' },
-            { number: 39, word: 'EVER' },
-            { number: 40, word: 'DANE' },
-            { number: 43, word: 'SHY' },
-            { number: 44, word: 'TEA' },
-            { number: 45, word: 'EEL' },
-            { number: 46, word: 'RBI' }
-        ];
-        
-        this.renderClueList('across-clues', acrossClues);
-        this.renderClueList('down-clues', downClues);
-        console.log('Clues loaded');
+            // Expecting data.Across and data.Down as arrays of {number, clue, length}
+            this.clues.across = data.Across;
+            this.clues.down = data.Down;
+
+            this.renderClueList('across-clues', this.clues.across);
+            this.renderClueList('down-clues', this.clues.down);
+            console.log('Clues loaded from input.json');
+        } catch (err) {
+            console.error('Failed to load clues from input.json:', err);
+        }
     }
     
     renderWordList(containerId, words) {
@@ -300,11 +95,12 @@ class CrosswordBuilder {
             clueElement.className = 'clue-item';
             clueElement.dataset.number = clueData.number;
             clueElement.dataset.direction = containerId.includes('across') ? 'across' : 'down';
+            clueElement.dataset.length = clueData.length;
             
             clueElement.innerHTML = `
                 <div class="clue-number">${clueData.number}.</div>
                 <div class="clue-text">${clueData.clue}</div>
-                <div class="clue-length">(${clueData.length} letters)</div>
+                ${clueData.length !== null ? `<div class="clue-length">(${clueData.length} letters)</div>` : ''}
             `;
             
             container.appendChild(clueElement);
@@ -315,19 +111,23 @@ class CrosswordBuilder {
     solveClue(clueElement) {
         const number = parseInt(clueElement.dataset.number);
         const direction = clueElement.dataset.direction;
-        const length = parseInt(clueElement.querySelector('.clue-length').textContent.match(/\d+/)[0]);
+        const length = clueElement.dataset.length === 'null' ? null : parseInt(clueElement.dataset.length);
         
         // Prompt user for answer
-        const userAnswer = prompt(`Enter answer for ${number}${direction === 'across' ? 'A' : 'D'}: ${clueElement.querySelector('.clue-text').textContent} (${length} letters)`);
+        const clueText = clueElement.querySelector('.clue-text').textContent;
+        const promptMsg = length ? `Enter answer for ${number}${direction === 'across' ? 'A' : 'D'}: ${clueText} (${length} letters)` : `Enter answer for ${number}${direction === 'across' ? 'A' : 'D'}: ${clueText}`;
+        const userAnswer = prompt(promptMsg);
         
         if (userAnswer !== null) {
             const answer = userAnswer.toUpperCase().trim();
             
-            // Check if answer length matches expected length (ignoring spaces)
-            const answerWithoutSpaces = answer.replace(/\s/g, '');
-            if (answerWithoutSpaces.length !== length) {
-                alert(`Answer must be ${length} letters long. You entered "${answer}" which is ${answerWithoutSpaces.length} letters (not counting spaces).`);
-                return;
+            // Only check length if length is not null
+            if (length !== null) {
+                const answerWithoutSpaces = answer.replace(/\s/g, '');
+                if (answerWithoutSpaces.length !== length) {
+                    alert(`Answer must be ${length} letters long. You entered "${answer}" which is ${answerWithoutSpaces.length} letters (not counting spaces).`);
+                    return;
+                }
             }
             
             // Mark clue as solved and update its display
@@ -336,10 +136,10 @@ class CrosswordBuilder {
             this.solvedClues.add(`${direction}-${number}`);
             
             // Update clue display to show answer
-            const clueText = clueElement.querySelector('.clue-text');
+            const clueTextEl = clueElement.querySelector('.clue-text');
             const clueLength = clueElement.querySelector('.clue-length');
-            clueText.innerHTML = `${clueText.textContent} <span class="clue-answer">→ ${answer}</span>`;
-            clueLength.style.display = 'none';
+            clueTextEl.innerHTML = `${clueTextEl.textContent} <span class="clue-answer">→ ${answer}</span>`;
+            if (clueLength) clueLength.style.display = 'none';
             
             // Move solved clue to bottom of list
             const container = clueElement.parentElement;
@@ -1113,8 +913,11 @@ class CrosswordBuilder {
     }
 }
 
-// Initialize the app
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOM loaded, initializing CrosswordBuilder');
-    new CrosswordBuilder();
-}); 
+// Add a guard to prevent double initialization
+if (!window.__crosswordBuilderInitialized) {
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('DOM loaded, initializing CrosswordBuilder');
+        new CrosswordBuilder();
+        window.__crosswordBuilderInitialized = true;
+    });
+} 
