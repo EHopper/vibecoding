@@ -1,386 +1,84 @@
 {
-  "Across": [
-    {
-      "number": 1,
-      "clue": "K-pop supergroup",
-      "length": null
-    },
-    {
-      "number": 4,
-      "clue": "What an angry customer may leave",
-      "length": null
-    },
-    {
-      "number": 9,
-      "clue": "Vast Mongolian desert",
-      "length": null
-    },
-    {
-      "number": 13,
-      "clue": "Google.com, e.g.",
-      "length": null
-    },
-    {
-      "number": 14,
-      "clue": "Sound heard before &quot;Bless you!&quot;",
-      "length": null
-    },
-    {
-      "number": 15,
-      "clue": "One producing cakes and cookies",
-      "length": null
-    },
-    {
-      "number": 16,
-      "clue": "Successful throws to the end zone",
-      "length": null
-    },
-    {
-      "number": 19,
-      "clue": "Heinie",
-      "length": null
-    },
-    {
-      "number": 20,
-      "clue": "C\u00f4te d&#39;___ (French Riviera)",
-      "length": null
-    },
-    {
-      "number": 21,
-      "clue": "Regular 6 p.m. broadcast of daily events",
-      "length": null
-    },
-    {
-      "number": 29,
-      "clue": "Regretted",
-      "length": null
-    },
-    {
-      "number": 30,
-      "clue": "___-weenie",
-      "length": null
-    },
-    {
-      "number": 31,
-      "clue": "Big TV network in the U.K.",
-      "length": null
-    },
-    {
-      "number": 34,
-      "clue": "Take the ___ (acquire control)",
-      "length": null
-    },
-    {
-      "number": 37,
-      "clue": "Threadbare",
-      "length": null
-    },
-    {
-      "number": 38,
-      "clue": "Vans from hotels to terminals and back",
-      "length": null
-    },
-    {
-      "number": 42,
-      "clue": "Sports org. at the center of a 2021 antitrust ruling",
-      "length": null
-    },
-    {
-      "number": 43,
-      "clue": "Ones crossing picket lines",
-      "length": null
-    },
-    {
-      "number": 44,
-      "clue": "Ending with lemon or orange",
-      "length": null
-    },
-    {
-      "number": 45,
-      "clue": "Rejected, as an application",
-      "length": null
-    },
-    {
-      "number": 48,
-      "clue": "Enjoy a book or magazine",
-      "length": null
-    },
-    {
-      "number": 50,
-      "clue": "Their are fore of them hear in this sentance",
-      "length": null
-    },
-    {
-      "number": 55,
-      "clue": "&quot;Gotcha&quot;",
-      "length": null
-    },
-    {
-      "number": 56,
-      "clue": "Series of push-ups or curls at a gym",
-      "length": null
-    },
-    {
-      "number": 58,
-      "clue": "Slogan for the Pok\u00e9mon franchise ... also appropriate for 16-, 21-, 38- and 50-Across?",
-      "length": null
-    },
-    {
-      "number": 65,
-      "clue": "Actress Amy or President John Quincy",
-      "length": null
-    },
-    {
-      "number": 66,
-      "clue": "Like the boonies",
-      "length": null
-    },
-    {
-      "number": 67,
-      "clue": "Abbreviation for an Army absence",
-      "length": null
-    },
-    {
-      "number": 68,
-      "clue": "Mercedes-___",
-      "length": null
-    },
-    {
-      "number": 69,
-      "clue": "Pluckiness",
-      "length": null
-    },
-    {
-      "number": 70,
-      "clue": "Place for a pig",
-      "length": null
-    }
-  ],
-  "Down": [
-    {
-      "number": 1,
-      "clue": "Remainder of a cigarette",
-      "length": null
-    },
-    {
-      "number": 2,
-      "clue": "Word after rainbow or steelhead",
-      "length": null
-    },
-    {
-      "number": 3,
-      "clue": "Watery snow",
-      "length": null
-    },
-    {
-      "number": 4,
-      "clue": "&quot;Gonna pass&quot;",
-      "length": null
-    },
-    {
-      "number": 5,
-      "clue": "Anxiety-related condition, for short",
-      "length": null
-    },
-    {
-      "number": 6,
-      "clue": "Even if, informally",
-      "length": null
-    },
-    {
-      "number": 7,
-      "clue": "Des Moines denizen",
-      "length": null
-    },
-    {
-      "number": 8,
-      "clue": "___ scheme (financial fraud)",
-      "length": null
-    },
-    {
-      "number": 9,
-      "clue": "Purchase at a pump",
-      "length": null
-    },
-    {
-      "number": 10,
-      "clue": "Gives the go-ahead",
-      "length": null
-    },
-    {
-      "number": 11,
-      "clue": "&quot;Busy&quot; buzzer",
-      "length": null
-    },
-    {
-      "number": 12,
-      "clue": "Org. that orders audits",
-      "length": null
-    },
-    {
-      "number": 15,
-      "clue": "Flat-bottomed boat",
-      "length": null
-    },
-    {
-      "number": 17,
-      "clue": "One-named singer of &quot;If I Could Turn Back Time&quot;",
-      "length": null
-    },
-    {
-      "number": 18,
-      "clue": "Common fourth-and-long decision",
-      "length": null
-    },
-    {
-      "number": 22,
-      "clue": "Currency in Lyon but not London",
-      "length": null
-    },
-    {
-      "number": 23,
-      "clue": "Swerve",
-      "length": null
-    },
-    {
-      "number": 24,
-      "clue": "Does some copy desk work",
-      "length": null
-    },
-    {
-      "number": 25,
-      "clue": "Semiaquatic salamander",
-      "length": null
-    },
-    {
-      "number": 26,
-      "clue": "___ Holmes (Sherlock&#39;s sister, on Netflix)",
-      "length": null
-    },
-    {
-      "number": 27,
-      "clue": "Overcaffeinated, colloquially",
-      "length": null
-    },
-    {
-      "number": 28,
-      "clue": "Have a feeling",
-      "length": null
-    },
-    {
-      "number": 31,
-      "clue": "Lineup at Woodstock or Coachella",
-      "length": null
-    },
-    {
-      "number": 32,
-      "clue": "Muscle used in pull-ups, informally",
-      "length": null
-    },
-    {
-      "number": 33,
-      "clue": "Basic bird made in origami",
-      "length": null
-    },
-    {
-      "number": 35,
-      "clue": "Situation Room grp.",
-      "length": null
-    },
-    {
-      "number": 36,
-      "clue": "What two toddlers should learn to do",
-      "length": null
-    },
-    {
-      "number": 39,
-      "clue": "Aid in making a sandcastle",
-      "length": null
-    },
-    {
-      "number": 40,
-      "clue": "Lyft rival",
-      "length": null
-    },
-    {
-      "number": 41,
-      "clue": "Bygone Russian ruler",
-      "length": null
-    },
-    {
-      "number": 46,
-      "clue": "Man&#39;s name that is an anagram of AISLE",
-      "length": null
-    },
-    {
-      "number": 47,
-      "clue": "Kind of golf that uses baskets instead of holes",
-      "length": null
-    },
-    {
-      "number": 49,
-      "clue": "Housing on a college quad",
-      "length": null
-    },
-    {
-      "number": 51,
-      "clue": "Gets closer",
-      "length": null
-    },
-    {
-      "number": 52,
-      "clue": "Elaborate outfit",
-      "length": null
-    },
-    {
-      "number": 53,
-      "clue": "Quantities of paper",
-      "length": null
-    },
-    {
-      "number": 54,
-      "clue": "Treat with bananas and ice cream",
-      "length": null
-    },
-    {
-      "number": 57,
-      "clue": "Kill it, in a good way",
-      "length": null
-    },
-    {
-      "number": 58,
-      "clue": "Gossip, gossip, gossip",
-      "length": null
-    },
-    {
-      "number": 59,
-      "clue": "Positive poem",
-      "length": null
-    },
-    {
-      "number": 60,
-      "clue": "Something to pick up at a beach?",
-      "length": null
-    },
-    {
-      "number": 61,
-      "clue": "Celebrity gossip website",
-      "length": null
-    },
-    {
-      "number": 62,
-      "clue": "Word on a French wine label",
-      "length": null
-    },
-    {
-      "number": 63,
-      "clue": "___ Solo of &quot;Star Wars&quot;",
-      "length": null
-    },
-    {
-      "number": 64,
-      "clue": "Animal with a fraternal order named after it",
-      "length": null
-    }
-  ]
+    "across": [
+        "1. ___, beta, gamma ...",
+        "6. Like skyscrapers",
+        "10. Not fully closed",
+        "14. Lulu",
+        "15. Creme-filled cookie",
+        "16. Stubborn beast",
+        "17. With 37- and 56-Across, where &quot;God Save the Queen&quot; is the national anthem",
+        "20. Heavy weight",
+        "21. Dancer Charisse",
+        "22. Hoodwinks",
+        "23. No-no",
+        "26. Arcade game name",
+        "28. Improvement",
+        "30. Wharf",
+        "31. 76ers&#39; org.",
+        "34. Jawaharlal of India",
+        "35. Fourth-down option",
+        "36. Middle Brady Bunch girl",
+        "37. See 17-Across",
+        "41. Superlative suffix",
+        "42. Is sick",
+        "43. Parish priest",
+        "44. ___ Speedwagon",
+        "45. Almanac datum",
+        "46. Torment a stand-up comedian",
+        "47. Egg beater",
+        "49. Abstract artist Albers",
+        "50. Forearm bones",
+        "52. It&#39;s bottled in Cannes",
+        "53. &quot;7 Faces of Dr. ___&quot; (1964 flick)",
+        "56. See 17-Across",
+        "61. Apple or maple",
+        "62. Cry like a banshee",
+        "63. Kind of question",
+        "64. With 65-Across, Miscellany, when separated by &quot;and&quot;",
+        "65. See 64-Across",
+        "66. Obsolete anesthetic"
+    ],
+    "down": [
+        "1. Be adjacent to",
+        "2. Letterman rival",
+        "3. Celebrate",
+        "4. Simple shelter",
+        "5. Gobbled up",
+        "6. 1964 Olympics host",
+        "7. Dry",
+        "8. Football great Dawson",
+        "9. Nautical journal",
+        "10. Love affair",
+        "11. Rolling Stones hit of 1968",
+        "12. Lotion ingredient",
+        "13. They keep track of pins",
+        "18. Pesticide brand",
+        "19. W.W. II turning point",
+        "24. Surrounding glow",
+        "25. Very dry, as Champagne",
+        "26. Some wedding guests",
+        "27. &quot;Toodle-oo!&quot;",
+        "28. Felix of &quot;The Odd Couple&quot;",
+        "29. Intrinsically",
+        "30. Colorful cover",
+        "32. Hackneyed",
+        "33. Wrestling&#39;s ___ the Giant",
+        "35. Puncture",
+        "38. Sheepish sounds",
+        "39. Currier&#39;s partner",
+        "40. Heading on Santa&#39;s list",
+        "45. Ichthyologist&#39;s study",
+        "46. Daylight savings saving",
+        "48. Despises",
+        "49. Puts behind bars",
+        "50. Golden rule word",
+        "51. &quot;___ of the Flies&quot;",
+        "52. Novelist Bagnold",
+        "54. Game show host Robinson",
+        "55. Stink",
+        "57. Emitter of 38-Down",
+        "58. Competed in a 10K",
+        "59. Needle part",
+        "60. Tennis call"
+    ]
 }
