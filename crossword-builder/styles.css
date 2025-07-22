@@ -143,18 +143,18 @@ h1 {
     background-color: #333;
     border-color: #333;
 }
-.cell.number {
-    font-size: 5px;
+.cell .number {
     position: absolute;
-    top: 0px;
-    left: 1px;
+    top: -1px;
+    left: -1px;
     color: #666;
     font-weight: bold;
     font-family: Arial, sans-serif;
     transform: scale(0.7);
     z-index: 3;
+    line-height: 1;
 }
-.cell.letter {
+.cell .letter {
     font-size: 14px;
     color: #000;
     z-index: 2;

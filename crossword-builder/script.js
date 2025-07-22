@@ -864,21 +864,33 @@ class CrosswordBuilder {
                     endCell.element.classList.remove('black');
                 }
             }
+            // Remove leading black square if not shared
+            let beforeRow = startRow, beforeCol = startCol;
+            if (word.direction === 'across') beforeCol = startCol - 1;
+            else beforeRow = startRow - 1;
+            if (this.isValidCell(beforeRow, beforeCol)) {
+                const beforeCell = this.grid[beforeRow][beforeCol];
+                // Only remove if it's black and not used as a leading black square for another word
+                const isLeadingForAnother = this.placedWords.some(w => {
+                    let otherBeforeRow = w.startRow, otherBeforeCol = w.startCol;
+                    if (w.direction === 'across') otherBeforeCol = w.startCol - 1;
+                    else otherBeforeRow = w.startRow - 1;
+                    return otherBeforeRow === beforeRow && otherBeforeCol === beforeCol;
+                });
+                if (beforeCell.isBlack && !isLeadingForAnother) {
+                    beforeCell.isBlack = false;
+                    beforeCell.element.classList.remove('black');
+                }
+            }
             // Update the number display
             const firstCell = this.grid[startRow][startCol];
-            if (firstCell.words.length === 0) {
+            // Only remove the number if no other word starts here
+            const stillHasWord = this.placedWords.some(w => w.startRow === startRow && w.startCol === startCol);
+            if (!stillHasWord) {
                 firstCell.number = null;
                 const numberSpan = firstCell.element.querySelector('.number');
                 if (numberSpan) {
                     numberSpan.remove();
-                }
-            } else {
-                // Update number to show remaining words
-                const numbers = [...new Set(firstCell.words.map(w => w.number))];
-                firstCell.number = numbers.join(',');
-                let numberSpan = firstCell.element.querySelector('.number');
-                if (numberSpan) {
-                    numberSpan.textContent = firstCell.number;
                 }
             }
             this.updateNumberColors();
@@ -1047,13 +1059,22 @@ class CrosswordBuilder {
             if (cell.isBlack) return false;
             if (cell.letter && cell.letter !== word[i]) return false;
         }
-        // Autoblock: check the cell after the end of the word
+        // Allow black square collision at before/after, but not with letters
+        // Check the cell before the start of the word
+        let beforeRow = row, beforeCol = col;
+        if (direction === 'across') beforeCol = col - 1;
+        else beforeRow = row - 1;
+        if (this.isValidCell(beforeRow, beforeCol)) {
+            const beforeCell = this.grid[beforeRow][beforeCol];
+            if (beforeCell.letter) return false;
+        }
+        // Check the cell after the end of the word
         let endRow = row, endCol = col;
         if (direction === 'across') endCol = col + word.length;
         else endRow = row + word.length;
         if (this.isValidCell(endRow, endCol)) {
             const endCell = this.grid[endRow][endCol];
-            if (endCell.letter || endCell.isBlack) return false;
+            if (endCell.letter) return false;
         }
         // Check for number conflicts
         const firstCell = this.grid[row][col];
@@ -1084,7 +1105,21 @@ class CrosswordBuilder {
             letterSpan.textContent = word[i];
             cell.element.appendChild(letterSpan);
         }
-        // Autoblock: add a black square at the end of the word if possible
+        // Autoblock: add a black square before and after the word if possible (and not overlapping a letter)
+        let beforeRow = row, beforeCol = col;
+        if (direction === 'across') beforeCol = col - 1;
+        else beforeRow = row - 1;
+        if (this.isValidCell(beforeRow, beforeCol)) {
+            const beforeCell = this.grid[beforeRow][beforeCol];
+            if (!beforeCell.letter && !beforeCell.isBlack) {
+                beforeCell.isBlack = true;
+                beforeCell.element.classList.add('black');
+                beforeCell.element.innerHTML = '';
+                beforeCell.letter = null;
+                beforeCell.number = null;
+                beforeCell.words = [];
+            }
+        }
         let endRow = row, endCol = col;
         if (direction === 'across') endCol = col + word.length;
         else endRow = row + word.length;
@@ -1107,8 +1142,6 @@ class CrosswordBuilder {
             startRow: row,
             startCol: col
         });
-        // Mark word as placed in the list
-        // this.markWordAsPlaced(word, direction, number); // Removed
         this.updateNumberColors();
         this.updateClueOnGridStates();
     }
