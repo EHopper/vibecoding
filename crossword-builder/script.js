@@ -1,6 +1,6 @@
 class CrosswordBuilder {
     constructor() {
-        this.gridSize = 15;
+        this.gridSize = 20;
         this.grid = [];
         this.placedWords = [];
         this.selectedWord = null;
@@ -130,6 +130,21 @@ class CrosswordBuilder {
                 }
             }
             
+            // Remove previous answer from the grid if it exists
+            const prevWordElement = document.querySelector(`#${direction}-words .word-item[data-number='${number}']`);
+            if (prevWordElement) {
+                // If the previous answer is on the grid, remove it
+                if (prevWordElement.classList.contains('placed')) {
+                    // Find the placed word in placedWords
+                    const placedWord = this.placedWords.find(w => w.number === number && w.direction === direction);
+                    if (placedWord) {
+                        this.removeWord(placedWord.startRow, placedWord.startCol);
+                    }
+                }
+                // Remove the previous word element from the list
+                prevWordElement.remove();
+            }
+            
             // Mark clue as solved and update its display
             clueElement.classList.add('solved');
             clueElement.dataset.answer = answer;
@@ -145,7 +160,7 @@ class CrosswordBuilder {
             const container = clueElement.parentElement;
             container.appendChild(clueElement);
             
-            // Add user's answer to the word list (whether correct or incorrect)
+            // Add or update user's answer in the word list
             const wordData = {
                 number: number,
                 word: answer,
@@ -238,7 +253,7 @@ class CrosswordBuilder {
             }
         });
 
-        // Double-click to remove selected words
+        // Double-click to remove selected words from the grid
         document.addEventListener('dblclick', (e) => {
             console.log('Double-click event on:', e.target);
             
@@ -256,6 +271,74 @@ class CrosswordBuilder {
                     e.preventDefault();
                     e.stopPropagation();
                 }
+            }
+
+            // Double-click to remove answer from the answer list
+            let wordElement = e.target;
+            while (wordElement && !wordElement.classList.contains('word-item')) {
+                wordElement = wordElement.parentElement;
+            }
+            if (wordElement && wordElement.classList.contains('word-item')) {
+                const number = parseInt(wordElement.dataset.number);
+                const direction = wordElement.dataset.direction;
+                // If the answer is on the grid, remove it
+                if (wordElement.classList.contains('placed')) {
+                    const placedWord = this.placedWords.find(w => w.number === number && w.direction === direction);
+                    if (placedWord) {
+                        this.removeWord(placedWord.startRow, placedWord.startCol);
+                    }
+                }
+                // Remove the word element from the list
+                wordElement.remove();
+                // Mark the clue as unsolved
+                const clueListId = direction === 'across' ? 'across-clues' : 'down-clues';
+                const clueList = document.getElementById(clueListId);
+                // Find the clue element
+                const clueElements = clueList.querySelectorAll('.clue-item');
+                let clueElement = null;
+                clueElements.forEach(el => {
+                    if (parseInt(el.dataset.number) === number) {
+                        clueElement = el;
+                    }
+                });
+                if (clueElement) {
+                    clueElement.classList.remove('solved');
+                    clueElement.removeAttribute('data-answer');
+                    // Restore clue text and length
+                    const clueTextEl = clueElement.querySelector('.clue-text');
+                    const clueData = (direction === 'across' ? this.clues.across : this.clues.down).find(c => c.number === number);
+                    if (clueTextEl && clueData) {
+                        clueTextEl.textContent = clueData.clue;
+                    }
+                    const clueLengthEl = clueElement.querySelector('.clue-length');
+                    if (clueLengthEl) {
+                        if (clueData && clueData.length !== null) {
+                            clueLengthEl.textContent = `(${clueData.length} letters)`;
+                            clueLengthEl.style.display = '';
+                        } else {
+                            clueLengthEl.remove();
+                        }
+                    } else if (clueData && clueData.length !== null) {
+                        // If clue-length was removed, add it back
+                        const newClueLength = document.createElement('div');
+                        newClueLength.className = 'clue-length';
+                        newClueLength.textContent = `(${clueData.length} letters)`;
+                        clueElement.appendChild(newClueLength);
+                    }
+                    // Move clue back to its original position
+                    // Find the correct index in the clue list
+                    const cluesArr = direction === 'across' ? this.clues.across : this.clues.down;
+                    const originalIndex = cluesArr.findIndex(c => c.number === number);
+                    if (originalIndex !== -1) {
+                        if (clueList.children[originalIndex] !== clueElement) {
+                            clueList.insertBefore(clueElement, clueList.children[originalIndex]);
+                        }
+                    }
+                }
+                // Remove from solvedClues set
+                this.solvedClues.delete(`${direction}-${number}`);
+                e.preventDefault();
+                e.stopPropagation();
             }
         });
         
