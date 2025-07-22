@@ -53,9 +53,15 @@ class CrosswordBuilder {
             const response = await fetch('input.json');
             const data = await response.json();
 
-            // Expecting data.Across and data.Down as arrays of {number, clue, length}
-            this.clues.across = data.Across;
-            this.clues.down = data.Down;
+            // New format: data.across and data.down are arrays of strings like '1. Clue text'
+            this.clues.across = data.across.map(str => {
+                const match = str.match(/^(\d+)\.\s*(.*)$/);
+                return match ? { number: parseInt(match[1]), clue: match[2], length: null } : null;
+            }).filter(Boolean);
+            this.clues.down = data.down.map(str => {
+                const match = str.match(/^(\d+)\.\s*(.*)$/);
+                return match ? { number: parseInt(match[1]), clue: match[2], length: null } : null;
+            }).filter(Boolean);
 
             this.renderClueList('across-clues', this.clues.across);
             this.renderClueList('down-clues', this.clues.down);
@@ -96,13 +102,11 @@ class CrosswordBuilder {
             clueElement.dataset.number = clueData.number;
             clueElement.dataset.direction = containerId.includes('across') ? 'across' : 'down';
             clueElement.dataset.length = clueData.length;
-            
             clueElement.innerHTML = `
-                <div class="clue-number">${clueData.number}.</div>
-                <div class="clue-text">${clueData.clue}</div>
-                ${clueData.length !== null ? `<div class="clue-length">(${clueData.length} letters)</div>` : ''}
+                <span class="clue-number">${clueData.number}.</span>
+                <span class="clue-text">${clueData.clue}</span>
+                ${clueData.length !== null ? `<span class="clue-length">(${clueData.length} letters)</span>` : ''}
             `;
-            
             container.appendChild(clueElement);
         });
         console.log('Rendered', clues.length, 'clues in', containerId);
@@ -187,158 +191,174 @@ class CrosswordBuilder {
             
             console.log('Solved clue:', number, direction, 'User answer:', answer);
         }
+        this.resortClues(direction);
+        this.resortAnswers(direction);
     }
     
     setupEventListeners() {
         console.log('Setting up event listeners...');
-        
-        // Word item and clue click events
+        // Clue click: prompt for answer, display next to clue, mark as answered
         document.addEventListener('click', (e) => {
-            console.log('Click event on:', e.target);
-            
-            // Check if clicking on a clue item (including child elements)
+            // Clue click
             let clueElement = e.target;
             while (clueElement && !clueElement.classList.contains('clue-item')) {
                 clueElement = clueElement.parentElement;
             }
-            
             if (clueElement && clueElement.classList.contains('clue-item')) {
-                console.log('Solving clue');
-                this.solveClue(clueElement);
-                e.preventDefault();
-                e.stopPropagation();
-                return;
-            }
-            
-            // Check if clicking on a word item (including child elements)
-            let wordElement = e.target;
-            while (wordElement && !wordElement.classList.contains('word-item')) {
-                wordElement = wordElement.parentElement;
-            }
-            
-            if (wordElement && wordElement.classList.contains('word-item') && !wordElement.classList.contains('placed')) {
-                console.log('Selecting word from list');
-                this.selectWord(wordElement);
-                e.preventDefault();
-                e.stopPropagation();
-                return;
-            }
-            
-            // Check if clicking on a cell or its child elements
-            let cellElement = e.target;
-            while (cellElement && !cellElement.classList.contains('cell')) {
-                cellElement = cellElement.parentElement;
-            }
-            
-            if (cellElement && cellElement.classList.contains('cell')) {
-                // If we have a word selected from the list, try to place it first
-                if (this.selectedWord && this.selectedWord.source === 'word-list') {
-                    console.log('Placing selected word from list on grid');
-                    this.placeSelectedWord(cellElement);
-                    e.preventDefault();
-                    e.stopPropagation();
-                } else if (cellElement.querySelector('.letter')) {
-                    // If no word selected from list, then try to select/switch grid words
-                    console.log('Selecting placed word from grid');
-                    this.selectPlacedWord(cellElement);
-                    e.preventDefault();
-                    e.stopPropagation();
-                } else if (!this.selectedWord && !cellElement.querySelector('.letter')) {
-                    // If no word selected and clicking on empty cell, toggle black square
-                    console.log('Toggling black square');
-                    this.toggleBlackSquare(cellElement);
-                    e.preventDefault();
-                    e.stopPropagation();
-                }
-            }
-        });
-
-        // Double-click to remove selected words from the grid
-        document.addEventListener('dblclick', (e) => {
-            console.log('Double-click event on:', e.target);
-            
-            // Check if clicking on a cell or its child elements
-            let cellElement = e.target;
-            while (cellElement && !cellElement.classList.contains('cell')) {
-                cellElement = cellElement.parentElement;
-            }
-            
-            if (cellElement && cellElement.classList.contains('cell')) {
-                // If cell has a letter and is selected, try to remove the word
-                if (cellElement.querySelector('.letter') && cellElement.classList.contains('selected')) {
-                    console.log('Double-click removing selected word');
-                    this.removeWordFromGrid(cellElement);
-                    e.preventDefault();
-                    e.stopPropagation();
-                }
-            }
-
-            // Double-click to remove answer from the answer list
-            let wordElement = e.target;
-            while (wordElement && !wordElement.classList.contains('word-item')) {
-                wordElement = wordElement.parentElement;
-            }
-            if (wordElement && wordElement.classList.contains('word-item')) {
-                const number = parseInt(wordElement.dataset.number);
-                const direction = wordElement.dataset.direction;
-                // If the answer is on the grid, remove it
-                if (wordElement.classList.contains('placed')) {
-                    const placedWord = this.placedWords.find(w => w.number === number && w.direction === direction);
-                    if (placedWord) {
-                        this.removeWord(placedWord.startRow, placedWord.startCol);
+                const number = parseInt(clueElement.dataset.number);
+                const direction = clueElement.dataset.direction;
+                const clueData = (direction === 'across' ? this.clues.across : this.clues.down).find(c => c.number === number);
+                const length = clueData && clueData.length !== null ? clueData.length : null;
+                const clueText = clueElement.querySelector('.clue-text').textContent;
+                const promptMsg = length ? `Enter answer for ${number}${direction === 'across' ? 'A' : 'D'}: ${clueText} (${length} letters)` : `Enter answer for ${number}${direction === 'across' ? 'A' : 'D'}: ${clueText}`;
+                const userAnswer = prompt(promptMsg);
+                if (userAnswer !== null) {
+                    const answer = userAnswer.toUpperCase().trim();
+                    if (length !== null) {
+                        const answerWithoutSpaces = answer.replace(/\s/g, '');
+                        if (answerWithoutSpaces.length !== length) {
+                            alert(`Answer must be ${length} letters long. You entered "${answer}" which is ${answerWithoutSpaces.length} letters (not counting spaces).`);
+                            return;
+                        }
+                    }
+                    // If the answer is already on the grid, remove it before placing the new one
+                    for (let r = 0; r < this.gridSize; r++) {
+                        for (let c = 0; c < this.gridSize; c++) {
+                            const cell = this.grid[r][c];
+                            if (cell.number && cell.number.toString().split(',').includes(number.toString())) {
+                                const placed = this.placedWords.find(w => w.number === number && w.direction === direction && w.startRow === r && w.startCol === c);
+                                if (placed) {
+                                    this.removeWord(r, c);
+                                }
+                            }
+                        }
+                    }
+                    // If a cell is already labeled with this number, try to place the answer immediately
+                    let placed = false;
+                    outer: for (let r = 0; r < this.gridSize; r++) {
+                        for (let c = 0; c < this.gridSize; c++) {
+                            const cell = this.grid[r][c];
+                            if (cell.number && cell.number.toString().split(',').includes(number.toString())) {
+                                if (this.canPlaceAnswerAt(r, c, direction, answer.replace(/\s+/g, ''), number)) {
+                                    clueData.userAnswer = answer;
+                                    clueElement.classList.add('solved');
+                                    clueElement.classList.add('answered');
+                                    clueElement.dataset.answer = answer;
+                                    const clueTextEl = clueElement.querySelector('.clue-text');
+                                    const clueLength = clueElement.querySelector('.clue-length');
+                                    clueTextEl.innerHTML = `${clueData.clue} <span class="clue-answer">→ ${answer}</span>`;
+                                    if (clueLength) clueLength.style.display = 'none';
+                                    this.placeAnswerAt(r, c, direction, answer.replace(/\s+/g, ''), number);
+                                    this.updateNumberColors();
+                                    placed = true;
+                                    break outer;
+                                } else {
+                                    alert('That answer cannot be placed on the grid at the existing numbered cell.');
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                    // If not already placed, just store answer and update clue display
+                    if (!placed) {
+                        clueData.userAnswer = answer;
+                        clueElement.classList.add('solved');
+                        clueElement.classList.add('answered');
+                        clueElement.dataset.answer = answer;
+                        const clueTextEl = clueElement.querySelector('.clue-text');
+                        const clueLength = clueElement.querySelector('.clue-length');
+                        clueTextEl.innerHTML = `${clueData.clue} <span class="clue-answer">→ ${answer}</span>`;
+                        if (clueLength) clueLength.style.display = 'none';
                     }
                 }
-                // Remove the word element from the list
-                wordElement.remove();
-                // Mark the clue as unsolved
-                const clueListId = direction === 'across' ? 'across-clues' : 'down-clues';
-                const clueList = document.getElementById(clueListId);
-                // Find the clue element
-                const clueElements = clueList.querySelectorAll('.clue-item');
-                let clueElement = null;
-                clueElements.forEach(el => {
-                    if (parseInt(el.dataset.number) === number) {
-                        clueElement = el;
+                return;
+            }
+            // Grid cell click: prompt for clue number, label cell (no answer required)
+            let cellElement = e.target;
+            while (cellElement && !cellElement.classList.contains('cell')) {
+                cellElement = cellElement.parentElement;
+            }
+            if (cellElement && cellElement.classList.contains('cell')) {
+                const row = parseInt(cellElement.dataset.row);
+                const col = parseInt(cellElement.dataset.col);
+                const cell = this.grid[row][col];
+                // Prompt for clue number
+                let number = prompt('Enter the clue number to place here:');
+                if (!number) return;
+                number = parseInt(number);
+                if (isNaN(number) || number <= 0) {
+                    alert('Invalid number.');
+                    return;
+                }
+                // Check if number is already used elsewhere (for labeling)
+                for (let r = 0; r < this.gridSize; r++) {
+                    for (let c = 0; c < this.gridSize; c++) {
+                        if ((r !== row || c !== col) && this.grid[r][c].number && this.grid[r][c].number.toString().split(',').includes(number.toString())) {
+                            alert('That number is already used elsewhere.');
+                            return;
+                        }
+                    }
+                }
+                // Label the cell (no answer required)
+                cell.number = number;
+                let numberSpan = cell.element.querySelector('.number');
+                if (!numberSpan) {
+                    numberSpan = document.createElement('span');
+                    numberSpan.className = 'number';
+                    numberSpan.textContent = number;
+                    // Insert number before letter if letter exists
+                    const letterSpan = cell.element.querySelector('.letter');
+                    if (letterSpan) {
+                        cell.element.insertBefore(numberSpan, letterSpan);
+                    } else {
+                        cell.element.appendChild(numberSpan);
+                    }
+                } else {
+                    numberSpan.textContent = number;
+                }
+                this.updateNumberColors();
+                // If answers for this number already exist, place them immediately (try both directions)
+                ['across', 'down'].forEach(direction => {
+                    const clueData = (direction === 'across' ? this.clues.across : this.clues.down).find(c => c.number === number);
+                    if (clueData && clueData.userAnswer) {
+                        const word = clueData.userAnswer.replace(/\s+/g, '');
+                        if (this.canPlaceAnswerAt(row, col, direction, word, number)) {
+                            this.placeAnswerAt(row, col, direction, word, number);
+                        }
                     }
                 });
-                if (clueElement) {
-                    clueElement.classList.remove('solved');
-                    clueElement.removeAttribute('data-answer');
-                    // Restore clue text and length
-                    const clueTextEl = clueElement.querySelector('.clue-text');
-                    const clueData = (direction === 'across' ? this.clues.across : this.clues.down).find(c => c.number === number);
-                    if (clueTextEl && clueData) {
-                        clueTextEl.textContent = clueData.clue;
-                    }
-                    const clueLengthEl = clueElement.querySelector('.clue-length');
-                    if (clueLengthEl) {
-                        if (clueData && clueData.length !== null) {
-                            clueLengthEl.textContent = `(${clueData.length} letters)`;
-                            clueLengthEl.style.display = '';
-                        } else {
-                            clueLengthEl.remove();
-                        }
-                    } else if (clueData && clueData.length !== null) {
-                        // If clue-length was removed, add it back
-                        const newClueLength = document.createElement('div');
-                        newClueLength.className = 'clue-length';
-                        newClueLength.textContent = `(${clueData.length} letters)`;
-                        clueElement.appendChild(newClueLength);
-                    }
-                    // Move clue back to its original position
-                    // Find the correct index in the clue list
-                    const cluesArr = direction === 'across' ? this.clues.across : this.clues.down;
-                    const originalIndex = cluesArr.findIndex(c => c.number === number);
-                    if (originalIndex !== -1) {
-                        if (clueList.children[originalIndex] !== clueElement) {
-                            clueList.insertBefore(clueElement, clueList.children[originalIndex]);
-                        }
-                    }
-                }
-                // Remove from solvedClues set
-                this.solvedClues.delete(`${direction}-${number}`);
+            }
+        });
+        // Right-click to remove number and answers
+        document.addEventListener('contextmenu', (e) => {
+            let cellElement = e.target;
+            while (cellElement && !cellElement.classList.contains('cell')) {
+                cellElement = cellElement.parentElement;
+            }
+            if (cellElement && cellElement.classList.contains('cell')) {
                 e.preventDefault();
-                e.stopPropagation();
+                const row = parseInt(cellElement.dataset.row);
+                const col = parseInt(cellElement.dataset.col);
+                const cell = this.grid[row][col];
+                // If the cell has a number, remove answers and number as before
+                if (cell.number) {
+                    const number = parseInt(cell.number.toString().split(',')[0]);
+                    // Remove across answer if present
+                    const acrossWord = this.placedWords.find(w => w.number === number && w.direction === 'across' && w.startRow === row && w.startCol === col);
+                    if (acrossWord) this.removeWord(row, col, 'across');
+                    // Remove down answer if present
+                    const downWord = this.placedWords.find(w => w.number === number && w.direction === 'down' && w.startRow === row && w.startCol === col);
+                    if (downWord) this.removeWord(row, col, 'down');
+                    // Remove number label
+                    cell.number = null;
+                    const numberSpan = cell.element.querySelector('.number');
+                    if (numberSpan) numberSpan.remove();
+                    this.updateNumberColors();
+                    this.updateClueOnGridStates();
+                } else {
+                    // Toggle black/white square
+                    this.toggleBlackSquare(cellElement);
+                }
             }
         });
         
@@ -506,6 +526,7 @@ class CrosswordBuilder {
         } else {
             console.log('Cannot place word at this location');
         }
+        this.resortAnswers(this.selectedWord.direction);
     }
 
     clearAllSelections() {
@@ -555,10 +576,11 @@ class CrosswordBuilder {
         this.removeWord(this.selectedWord.originalRow, this.selectedWord.originalCol);
         
         // Return it to the word list
-        this.unmarkWordAsPlaced(this.selectedWord.word, this.selectedWord.direction, this.selectedWord.number);
+        // this.unmarkWordAsPlaced(this.selectedWord.word, this.selectedWord.direction, this.selectedWord.number); // Removed
         
         // Clear the selection
         this.clearAllSelections();
+        this.resortAnswers(this.selectedWord.direction);
     }
 
     clearSelection() {
@@ -604,6 +626,22 @@ class CrosswordBuilder {
             // If cell has a letter, it must match
             if (cell.letter && cell.letter !== word[i]) {
                 console.log('Letter mismatch at', row, col, 'expected:', word[i], 'found:', cell.letter);
+                return false;
+            }
+        }
+        // Autoblock: check the cell after the end of the word
+        let endRow = startRow;
+        let endCol = startCol;
+        if (direction === 'across') {
+            endCol = startCol + word.length;
+        } else {
+            endRow = startRow + word.length;
+        }
+        if (this.isValidCell(endRow, endCol)) {
+            const endCell = this.grid[endRow][endCol];
+            if (endCell.letter || endCell.isBlack) {
+                console.log('Cannot autoblock: cell after word is occupied at', endRow, endCol);
+                alert('Cannot place word: the cell after the end of the word is already occupied.');
                 return false;
             }
         }
@@ -692,6 +730,26 @@ class CrosswordBuilder {
             cell.element.appendChild(letterSpan);
         }
 
+        // Autoblock: add a black square at the end of the word if possible
+        let endRow = startRow;
+        let endCol = startCol;
+        if (direction === 'across') {
+            endCol = startCol + word.length;
+        } else {
+            endRow = startRow + word.length;
+        }
+        if (this.isValidCell(endRow, endCol)) {
+            const endCell = this.grid[endRow][endCol];
+            if (!endCell.letter && !endCell.isBlack) {
+                endCell.isBlack = true;
+                endCell.element.classList.add('black');
+                endCell.element.innerHTML = '';
+                endCell.letter = null;
+                endCell.number = null;
+                endCell.words = [];
+            }
+        }
+
         // Record placed word
         this.placedWords.push({
             word: word,
@@ -702,10 +760,11 @@ class CrosswordBuilder {
         });
 
         // Mark word as placed in the list (use original word with spaces for matching)
-        this.markWordAsPlaced(this.selectedWord.word, direction, number);
+        // this.markWordAsPlaced(this.selectedWord.word, direction, number); // Removed
 
         // Update number colors for duplicates
         this.updateNumberColors();
+        this.updateClueOnGridStates();
     }
 
     updateNumberColors() {
@@ -741,86 +800,29 @@ class CrosswordBuilder {
         });
     }
 
-    markWordAsPlaced(word, direction, number) {
-        const containerId = direction === 'across' ? 'across-words' : 'down-words';
-        const container = document.getElementById(containerId);
-        
-        // Find the word element
-        const wordElements = container.querySelectorAll('.word-item');
-        let targetElement = null;
-        
-        wordElements.forEach(element => {
-            if (element.dataset.word === word && 
-                parseInt(element.dataset.number) === number &&
-                element.dataset.direction === direction) {
-                targetElement = element;
-            }
-        });
-        
-        if (targetElement) {
-            // Mark as placed
-            targetElement.classList.add('placed');
-            targetElement.draggable = false;
-            
-            // Move to bottom
-            container.appendChild(targetElement);
-        }
-    }
+    // Removed markWordAsPlaced and unmarkWordAsPlaced function definitions and all calls to them throughout the file.
 
-    unmarkWordAsPlaced(word, direction, number) {
-        const containerId = direction === 'across' ? 'across-words' : 'down-words';
-        const container = document.getElementById(containerId);
-        
-        // Find the word element
-        const wordElements = container.querySelectorAll('.word-item');
-        let targetElement = null;
-        
-        wordElements.forEach(element => {
-            if (element.dataset.word === word && 
-                parseInt(element.dataset.number) === number &&
-                element.dataset.direction === direction) {
-                targetElement = element;
-            }
-        });
-        
-        if (targetElement) {
-            // Unmark as placed
-            targetElement.classList.remove('placed');
-            targetElement.draggable = true;
-            
-            // Move back to original position (this is simplified - you might want more sophisticated sorting)
-            // For now, just move it to the top
-            container.insertBefore(targetElement, container.firstChild);
-        }
-    }
-
-    removeWord(startRow, startCol) {
+    removeWord(startRow, startCol, directionOverride) {
         // Find the word to remove
-        const wordIndex = this.placedWords.findIndex(w => 
-            w.startRow === startRow && w.startCol === startCol
+        const wordIndex = this.placedWords.findIndex(w =>
+            w.startRow === startRow && w.startCol === startCol && (!directionOverride || w.direction === directionOverride)
         );
-        
         if (wordIndex !== -1) {
             const word = this.placedWords[wordIndex];
-            
             // Remove letters and word tracking
             for (let i = 0; i < word.word.length; i++) {
                 let row = startRow;
                 let col = startCol;
-
                 if (word.direction === 'across') {
                     col = startCol + i;
                 } else {
                     row = startRow + i;
                 }
-
                 const cell = this.grid[row][col];
-                
                 // Remove this word from the cell's word list
-                cell.words = cell.words.filter(w => 
+                cell.words = cell.words.filter(w =>
                     !(w.word === word.word && w.direction === word.direction)
                 );
-                
                 // If no more words use this cell, clear the letter
                 if (cell.words.length === 0) {
                     cell.letter = null;
@@ -830,10 +832,26 @@ class CrosswordBuilder {
                     }
                 }
             }
-            
             // Remove the word from placed words
             this.placedWords.splice(wordIndex, 1);
-            
+            // Remove trailing black square if not shared
+            let endRow = startRow, endCol = startCol;
+            if (word.direction === 'across') endCol = startCol + word.word.length;
+            else endRow = startRow + word.word.length;
+            if (this.isValidCell(endRow, endCol)) {
+                const endCell = this.grid[endRow][endCol];
+                // Only remove if it's black and not used as a trailing black square for another word
+                const isTrailingForAnother = this.placedWords.some(w => {
+                    let otherEndRow = w.startRow, otherEndCol = w.startCol;
+                    if (w.direction === 'across') otherEndCol = w.startCol + w.word.length;
+                    else otherEndRow = w.startRow + w.word.length;
+                    return otherEndRow === endRow && otherEndCol === endCol;
+                });
+                if (endCell.isBlack && !isTrailingForAnother) {
+                    endCell.isBlack = false;
+                    endCell.element.classList.remove('black');
+                }
+            }
             // Update the number display
             const firstCell = this.grid[startRow][startCol];
             if (firstCell.words.length === 0) {
@@ -851,12 +869,8 @@ class CrosswordBuilder {
                     numberSpan.textContent = firstCell.number;
                 }
             }
-            
-            // Unmark word as placed in the list
-            this.unmarkWordAsPlaced(word.word, word.direction, word.number);
-            
-            // Update number colors for duplicates
             this.updateNumberColors();
+            this.updateClueOnGridStates();
         }
     }
     
@@ -994,6 +1008,153 @@ class CrosswordBuilder {
             }
         }
     }
+
+    // Resort clues: unsolved at top, then solved, all sorted by number
+    resortClues(direction) {
+        const clueListId = direction === 'across' ? 'across-clues' : 'down-clues';
+        const clueList = document.getElementById(clueListId);
+        const cluesArr = direction === 'across' ? this.clues.across : this.clues.down;
+        // Get all clue elements
+        const clueElements = Array.from(clueList.querySelectorAll('.clue-item'));
+        // Map number to clue element
+        const clueMap = {};
+        clueElements.forEach(el => {
+            clueMap[parseInt(el.dataset.number)] = el;
+        });
+        // Sort: unsolved first, then solved, all by number
+        const unsolved = cluesArr.filter(c => !this.solvedClues.has(`${direction}-${c.number}`)).sort((a, b) => a.number - b.number);
+        const solved = cluesArr.filter(c => this.solvedClues.has(`${direction}-${c.number}`)).sort((a, b) => a.number - b.number);
+        const sorted = unsolved.concat(solved);
+        // Re-append in order
+        sorted.forEach((clue, idx) => {
+            const el = clueMap[clue.number];
+            if (el && clueList.children[idx] !== el) {
+                clueList.insertBefore(el, clueList.children[idx]);
+            }
+        });
+    }
+
+    // Resort answers: not on grid at top, then placed, all sorted by number
+    resortAnswers(direction) {
+        const wordListId = direction === 'across' ? 'across-words' : 'down-words';
+        const wordList = document.getElementById(wordListId);
+        const wordElements = Array.from(wordList.querySelectorAll('.word-item'));
+        // Not placed: no .placed class
+        const notPlaced = wordElements.filter(el => !el.classList.contains('placed')).sort((a, b) => parseInt(a.dataset.number) - parseInt(b.dataset.number));
+        const placed = wordElements.filter(el => el.classList.contains('placed')).sort((a, b) => parseInt(a.dataset.number) - parseInt(b.dataset.number));
+        const sorted = notPlaced.concat(placed);
+        // Remove all children and re-append in sorted order
+        while (wordList.firstChild) wordList.removeChild(wordList.firstChild);
+        sorted.forEach(el => wordList.appendChild(el));
+    }
+
+    canPlaceAnswerAt(row, col, direction, word, number) {
+        // Check if word fits within grid
+        if (direction === 'across' && col + word.length > this.gridSize) return false;
+        if (direction === 'down' && row + word.length > this.gridSize) return false;
+        // Check for conflicts with existing letters and black squares
+        for (let i = 0; i < word.length; i++) {
+            let r = row, c = col;
+            if (direction === 'across') c = col + i;
+            else r = row + i;
+            const cell = this.grid[r][c];
+            if (cell.isBlack) return false;
+            if (cell.letter && cell.letter !== word[i]) return false;
+        }
+        // Autoblock: check the cell after the end of the word
+        let endRow = row, endCol = col;
+        if (direction === 'across') endCol = col + word.length;
+        else endRow = row + word.length;
+        if (this.isValidCell(endRow, endCol)) {
+            const endCell = this.grid[endRow][endCol];
+            if (endCell.letter || endCell.isBlack) return false;
+        }
+        // Check for number conflicts
+        const firstCell = this.grid[row][col];
+        if (firstCell.number) {
+            const numbers = firstCell.number.toString().split(',');
+            if (!numbers.includes(number.toString())) {
+                const existingNumbers = numbers.filter(n => n !== number.toString());
+                if (existingNumbers.length > 0) return false;
+            }
+        }
+        return true;
+    }
+
+    placeAnswerAt(row, col, direction, word, number) {
+        // Place letters and track word usage
+        for (let i = 0; i < word.length; i++) {
+            let r = row, c = col;
+            if (direction === 'across') c = col + i;
+            else r = row + i;
+            const cell = this.grid[r][c];
+            cell.letter = word[i];
+            cell.words.push({ word: word, direction: direction, number: number });
+            // Remove existing letter span if any
+            const existingLetter = cell.element.querySelector('.letter');
+            if (existingLetter) existingLetter.remove();
+            const letterSpan = document.createElement('span');
+            letterSpan.className = 'letter';
+            letterSpan.textContent = word[i];
+            cell.element.appendChild(letterSpan);
+        }
+        // Autoblock: add a black square at the end of the word if possible
+        let endRow = row, endCol = col;
+        if (direction === 'across') endCol = col + word.length;
+        else endRow = row + word.length;
+        if (this.isValidCell(endRow, endCol)) {
+            const endCell = this.grid[endRow][endCol];
+            if (!endCell.letter && !endCell.isBlack) {
+                endCell.isBlack = true;
+                endCell.element.classList.add('black');
+                endCell.element.innerHTML = '';
+                endCell.letter = null;
+                endCell.number = null;
+                endCell.words = [];
+            }
+        }
+        // Record placed word
+        this.placedWords.push({
+            word: word,
+            number: number,
+            direction: direction,
+            startRow: row,
+            startCol: col
+        });
+        // Mark word as placed in the list
+        // this.markWordAsPlaced(word, direction, number); // Removed
+        this.updateNumberColors();
+        this.updateClueOnGridStates();
+    }
+
+    // Helper to update clue visual state for on-grid answers
+    updateClueOnGridStates() {
+        ['across', 'down'].forEach(direction => {
+            const clueListId = direction === 'across' ? 'across-clues' : 'down-clues';
+            const clueList = document.getElementById(clueListId);
+            const cluesArr = direction === 'across' ? this.clues.across : this.clues.down;
+            cluesArr.forEach(clue => {
+                const clueElement = clueList.querySelector(`.clue-item[data-number='${clue.number}']`);
+                if (!clueElement) return;
+                // Is this answer on the grid?
+                const isOnGrid = this.placedWords.some(w => w.number === clue.number && w.direction === direction);
+                if (isOnGrid) {
+                    clueElement.classList.add('on-grid');
+                } else {
+                    clueElement.classList.remove('on-grid');
+                }
+                // Add or remove .answered class
+                if (clue.userAnswer) {
+                    clueElement.classList.add('answered');
+                } else {
+                    clueElement.classList.remove('answered');
+                }
+            });
+        });
+    }
+
+    // Call updateClueOnGridStates after placing/removing answers and after grid changes
+    // Example: after placeAnswerAt, removeWord, right-click removal, and after grid updates
 }
 
 // Add a guard to prevent double initialization

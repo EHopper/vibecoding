@@ -1,3 +1,9 @@
+html, body {
+    height: 100vh;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+}
 * {
     margin: 0;
     padding: 0;
@@ -11,8 +17,11 @@ body {
 }
 
 .container {
-    max-width: 1400px;
-    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 0;
+    height: 100vh;
 }
 
 h1 {
@@ -23,8 +32,10 @@ h1 {
 
 .main-content {
     display: flex;
-    gap: 20px;
-    align-items: flex-start;
+    flex-direction: row;
+    flex: 1 1 0;
+    min-height: 0;
+    height: 100%;
 }
 
 .clues-container {
@@ -50,11 +61,14 @@ h1 {
 }
 
 .clue-list {
-    max-height: 250px;
+    flex: 1 1 0;
+    min-height: 0;
+    height: auto;
     overflow-y: auto;
+    font-size: 0.95em;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 4px;
 }
 
 .clue-item {
@@ -273,4 +287,86 @@ h1 {
 
 .word-item.placed .word-number {
     color: #6c757d;
+}
+
+.clues-pair-container {
+    display: flex;
+    flex-direction: row;
+    gap: 32px;
+    flex: 1 1 0;
+    min-height: 0;
+    height: 100%;
+}
+.clue-section-tall {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+    background: #f8f9fa;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+}
+.clue-section-tall h3 {
+    flex: 0 0 auto;
+    margin-bottom: 8px;
+}
+.clue-list {
+    flex: 1 1 0;
+    min-height: 0;
+    height: auto;
+    overflow-y: auto;
+    font-size: 0.95em;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.clue-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 4px 0;
+    background: none;
+    border: none;
+    font-size: 1em;
+}
+.clue-item .clue-number {
+    font-weight: bold;
+    color: #007bff;
+    margin-right: 4px;
+    font-size: 1em;
+    min-width: 22px;
+    display: inline-block;
+}
+.clue-item .clue-text {
+    color: #333;
+    display: inline;
+}
+.clue-item .clue-length {
+    color: #666;
+    font-size: 0.9em;
+    margin-left: 6px;
+    display: inline;
+}
+.clue-answer {
+    color: #333;
+    font-weight: bold;
+    margin-left: 8px;
+    display: inline;
+}
+.clue-item.on-grid .clue-number {
+    color: #178a1c;
+}
+.clue-item.answered:not(.on-grid) {
+    background: rgba(23,138,28,0.12);
+}
+.clue-item.answered:not(.on-grid) .clue-number {
+    color: #178a1c;
+}
+.clue-item.on-grid {
+    background: #f8f9fa !important;
+}
+.clue-item.on-grid .clue-number {
+    color: #666 !important;
 } 
