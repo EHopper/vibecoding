@@ -199,67 +199,85 @@ class CrosswordBuilder {
                 const userAnswer = prompt(promptMsg);
                 const answer = userAnswer ? userAnswer.toUpperCase().trim() : '';
                 if (userAnswer !== null) {
-                    if (answer === '') {
-                        // Treat as no answer: remove any previous answer for this clue
-                        // Remove from grid if present
-                        for (let r = 0; r < this.gridSize; r++) {
-                            for (let c = 0; c < this.gridSize; c++) {
-                                const cell = this.grid[r][c];
-                                if (cell.number && cell.number.toString().split(',').includes(number.toString())) {
-                                    const placed = this.placedWords.find(w => w.number === number && w.direction === direction && w.startRow === r && w.startCol === c);
-                                    if (placed) {
-                                        this.removeWord(r, c, direction);
-                                    }
-                                }
-                            }
-                        }
-                        delete clueData.userAnswer;
-                        clueElement.classList.remove('solved', 'answered');
-                        clueElement.dataset.answer = '';
-                        // Restore clue text
-                        const clueTextEl = clueElement.querySelector('.clue-text');
-                        clueTextEl.innerHTML = clueData.clue;
-                        this.updateClueOnGridStates();
-                        return;
-                    }
-                    // If the answer is already on the grid, remove it before placing the new one
+                    // Check if the number is already on the grid
+                    let numberOnGrid = false;
+                    let gridRow = -1, gridCol = -1;
                     for (let r = 0; r < this.gridSize; r++) {
                         for (let c = 0; c < this.gridSize; c++) {
                             const cell = this.grid[r][c];
                             if (cell.number && cell.number.toString().split(',').includes(number.toString())) {
-                                const placed = this.placedWords.find(w => w.number === number && w.direction === direction && w.startRow === r && w.startCol === c);
-                                if (placed) {
-                                    this.removeWord(r, c);
-                                }
+                                numberOnGrid = true;
+                                gridRow = r;
+                                gridCol = c;
+                                break;
                             }
                         }
+                        if (numberOnGrid) break;
                     }
-                    // If a cell is already labeled with this number, try to place the answer immediately
-                    let placed = false;
-                    outer: for (let r = 0; r < this.gridSize; r++) {
-                        for (let c = 0; c < this.gridSize; c++) {
-                            const cell = this.grid[r][c];
-                            if (cell.number && cell.number.toString().split(',').includes(number.toString())) {
-                                if (this.canPlaceAnswerAt(r, c, direction, answer.replace(/\s+/g, ''), number)) {
-                                    clueData.userAnswer = answer;
-                                    clueElement.classList.add('solved');
-                                    clueElement.classList.add('answered');
-                                    clueElement.dataset.answer = answer;
-                                    const clueTextEl = clueElement.querySelector('.clue-text');
-                                    clueTextEl.innerHTML = `${clueData.clue} <span class="clue-answer">→ ${answer}</span>`;
-                                    this.placeAnswerAt(r, c, direction, answer.replace(/\s+/g, ''), number);
-                                    this.updateNumberColors();
-                                    placed = true;
-                                    break outer;
-                                } else {
-                                    alert('That answer cannot be placed on the grid at the existing numbered cell.');
-                                    return;
-                                }
-                            }
+                    
+                    if (!numberOnGrid) {
+                        // Number not on grid - handle empty answer case
+                        if (answer === '') {
+                            // Clear the answer but don't affect the grid structure
+                            delete clueData.userAnswer;
+                            clueElement.classList.remove('solved', 'answered');
+                            clueElement.dataset.answer = '';
+                            // Restore clue text
+                            const clueTextEl = clueElement.querySelector('.clue-text');
+                            clueTextEl.innerHTML = clueData.clue;
+                            this.updateClueOnGridStates();
+                            return;
                         }
                     }
-                    // If not already placed, just store answer and update clue display
-                    if (!placed) {
+                    
+                    if (numberOnGrid) {
+                        // Number is on grid - handle answer replacement
+                        const oldPlaced = this.placedWords.find(w => w.number === number && w.direction === direction);
+                        const oldAnswer = oldPlaced ? oldPlaced.word : null;
+                        
+                        // Remove old answer if it exists
+                        if (oldPlaced) {
+                            this.removeWord(oldPlaced.startRow, oldPlaced.startCol, direction);
+                        }
+                        
+                        // Try to place new answer
+                        if (answer === '' || this.canPlaceAnswerAt(gridRow, gridCol, direction, answer.replace(/\s+/g, ''), number)) {
+                            // New answer fits (or is empty) - place it
+                            if (answer !== '') {
+                                clueData.userAnswer = answer;
+                                clueElement.classList.add('solved');
+                                clueElement.classList.add('answered');
+                                clueElement.dataset.answer = answer;
+                                const clueTextEl = clueElement.querySelector('.clue-text');
+                                clueTextEl.innerHTML = `${clueData.clue} <span class="clue-answer">→ ${answer}</span>`;
+                                this.placeAnswerAt(gridRow, gridCol, direction, answer.replace(/\s+/g, ''), number);
+                            } else {
+                                // Empty answer - clear the clue
+                                delete clueData.userAnswer;
+                                clueElement.classList.remove('solved', 'answered');
+                                clueElement.dataset.answer = '';
+                                const clueTextEl = clueElement.querySelector('.clue-text');
+                                clueTextEl.innerHTML = clueData.clue;
+                            }
+                            this.updateNumberColors();
+                            this.updateClueOnGridStates();
+                        } else {
+                            // New answer doesn't fit - restore old answer
+                            if (oldAnswer) {
+                                clueData.userAnswer = oldAnswer;
+                                clueElement.classList.add('solved');
+                                clueElement.classList.add('answered');
+                                clueElement.dataset.answer = oldAnswer;
+                                const clueTextEl = clueElement.querySelector('.clue-text');
+                                clueTextEl.innerHTML = `${clueData.clue} <span class="clue-answer">→ ${oldAnswer}</span>`;
+                                this.placeAnswerAt(gridRow, gridCol, direction, oldAnswer, number);
+                                this.updateNumberColors();
+                            }
+                            alert('That answer cannot be placed on the grid at the existing numbered cell.');
+                            return;
+                        }
+                    } else {
+                        // Number not on grid - just store answer and update clue display
                         clueData.userAnswer = answer;
                         clueElement.classList.add('solved');
                         clueElement.classList.add('answered');
@@ -287,6 +305,13 @@ class CrosswordBuilder {
                     alert('Invalid number.');
                     return;
                 }
+                
+                // Validate number ordering
+                if (!this.isValidNumberPlacement(row, col, number)) {
+                    alert('Invalid number placement: numbers must increase monotonically from left to right in each row, and numbers in each row must be smaller than those above and larger than those below.');
+                    return;
+                }
+                
                 // Check if number is already used elsewhere (for labeling)
                 for (let r = 0; r < this.gridSize; r++) {
                     for (let c = 0; c < this.gridSize; c++) {
@@ -377,6 +402,67 @@ class CrosswordBuilder {
 
         
         console.log('Event listeners set up');
+    }
+
+    // New method to validate number placement
+    isValidNumberPlacement(row, col, number) {
+        // Check if this number would violate the monotonic ordering rules
+        
+        // Get all numbered cells in the grid
+        const numberedCells = [];
+        for (let r = 0; r < this.gridSize; r++) {
+            for (let c = 0; c < this.gridSize; c++) {
+                const cell = this.grid[r][c];
+                if (cell.number && !(r === row && c === col)) { // Exclude the cell we're placing
+                    numberedCells.push({ row: r, col: c, number: parseInt(cell.number.toString().split(',')[0]) });
+                }
+            }
+        }
+        
+        // Add the new number to the list for validation
+        numberedCells.push({ row: row, col: col, number: number });
+        
+        // Check each row for monotonic ordering
+        for (let r = 0; r < this.gridSize; r++) {
+            const rowNumbers = numberedCells.filter(cell => cell.row === r).sort((a, b) => a.col - b.col);
+            for (let i = 1; i < rowNumbers.length; i++) {
+                if (rowNumbers[i].number <= rowNumbers[i-1].number) {
+                    return false; // Not monotonically increasing
+                }
+            }
+        }
+        
+        // Check that numbers in each row are smaller than those above and larger than those below
+        for (let r = 0; r < this.gridSize; r++) {
+            const rowNumbers = numberedCells.filter(cell => cell.row === r);
+            for (let r2 = 0; r2 < this.gridSize; r2++) {
+                if (r2 === r) continue;
+                const otherRowNumbers = numberedCells.filter(cell => cell.row === r2);
+                
+                // Check if any number in this row is not smaller than numbers above
+                if (r2 < r) { // Other row is above
+                    for (const num1 of rowNumbers) {
+                        for (const num2 of otherRowNumbers) {
+                            if (num1.number >= num2.number) {
+                                return false;
+                            }
+                        }
+                    }
+                }
+                // Check if any number in this row is not larger than numbers below
+                if (r2 > r) { // Other row is below
+                    for (const num1 of rowNumbers) {
+                        for (const num2 of otherRowNumbers) {
+                            if (num1.number <= num2.number) {
+                                return false;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        return true;
     }
 
     selectWord(wordElement) {
@@ -815,12 +901,15 @@ class CrosswordBuilder {
     // Removed markWordAsPlaced and unmarkWordAsPlaced function definitions and all calls to them throughout the file.
 
     removeWord(startRow, startCol, directionOverride) {
+        console.log('removeWord called with:', startRow, startCol, directionOverride);
         // Find the word to remove
         const wordIndex = this.placedWords.findIndex(w =>
             w.startRow === startRow && w.startCol === startCol && (!directionOverride || w.direction === directionOverride)
         );
+        console.log('Found word at index:', wordIndex, 'total placed words:', this.placedWords.length);
         if (wordIndex !== -1) {
             const word = this.placedWords[wordIndex];
+            console.log('Removing word:', word.word, 'from grid');
             // Remove letters and word tracking
             for (let i = 0; i < word.word.length; i++) {
                 let row = startRow;
@@ -846,58 +935,66 @@ class CrosswordBuilder {
             }
             // Remove the word from placed words
             this.placedWords.splice(wordIndex, 1);
-            // Remove trailing black square if not shared
-            let endRow = startRow, endCol = startCol;
-            if (word.direction === 'across') endCol = startCol + word.word.length;
-            else endRow = startRow + word.word.length;
-            if (this.isValidCell(endRow, endCol)) {
-                const endCell = this.grid[endRow][endCol];
-                // Only remove if it's black and not used as a trailing black square for another word
-                const isTrailingForAnother = this.placedWords.some(w => {
-                    let otherEndRow = w.startRow, otherEndCol = w.startCol;
-                    if (w.direction === 'across') otherEndCol = w.startCol + w.word.length;
-                    else otherEndRow = w.startRow + w.word.length;
-                    return otherEndRow === endRow && otherEndCol === endCol;
-                });
-                if (endCell.isBlack && !isTrailingForAnother) {
-                    endCell.isBlack = false;
-                    endCell.element.classList.remove('black');
-                }
-            }
-            // Remove leading black square if not shared
-            let beforeRow = startRow, beforeCol = startCol;
-            if (word.direction === 'across') beforeCol = startCol - 1;
-            else beforeRow = startRow - 1;
-            if (this.isValidCell(beforeRow, beforeCol)) {
-                const beforeCell = this.grid[beforeRow][beforeCol];
-                // Only remove if it's black and not used as a leading black square for another word
-                const isLeadingForAnother = this.placedWords.some(w => {
-                    let otherBeforeRow = w.startRow, otherBeforeCol = w.startCol;
-                    if (w.direction === 'across') otherBeforeCol = w.startCol - 1;
-                    else otherBeforeRow = w.startRow - 1;
-                    return otherBeforeRow === beforeRow && otherBeforeCol === beforeCol;
-                });
-                if (beforeCell.isBlack && !isLeadingForAnother) {
-                    beforeCell.isBlack = false;
-                    beforeCell.element.classList.remove('black');
-                }
-            }
-            // Update the number display
-            const firstCell = this.grid[startRow][startCol];
-            // Only remove the number if no other word starts here
-            const stillHasWord = this.placedWords.some(w => w.startRow === startRow && w.startCol === startCol);
-            if (!stillHasWord) {
-                firstCell.number = null;
-                const numberSpan = firstCell.element.querySelector('.number');
-                if (numberSpan) {
-                    numberSpan.remove();
-                }
-            }
+            
+            // Check for black squares that can be removed
+            this.checkAndRemoveBlackSquares(startRow, startCol, word.direction, word.word.length);
+            
+            // Don't remove the number from the grid - numbers should only be removed by explicit grid interaction
+            // The number stays on the grid even when words are removed
             this.updateNumberColors();
             this.updateClueOnGridStates();
         }
     }
     
+    // New method to check and remove black squares only if not needed by other words
+    checkAndRemoveBlackSquares(startRow, startCol, direction, wordLength) {
+        // Check trailing black square
+        let endRow = startRow, endCol = startCol;
+        if (direction === 'across') endCol = startCol + wordLength;
+        else endRow = startRow + wordLength;
+        
+        if (this.isValidCell(endRow, endCol)) {
+            const endCell = this.grid[endRow][endCol];
+            if (endCell.isBlack) {
+                // Check if any other word needs this black square
+                const isNeededByOtherWord = this.placedWords.some(w => {
+                    let otherEndRow = w.startRow, otherEndCol = w.startCol;
+                    if (w.direction === 'across') otherEndCol = w.startCol + w.word.length;
+                    else otherEndRow = w.startRow + w.word.length;
+                    return otherEndRow === endRow && otherEndCol === endCol;
+                });
+                
+                if (!isNeededByOtherWord) {
+                    endCell.isBlack = false;
+                    endCell.element.classList.remove('black');
+                }
+            }
+        }
+        
+        // Check leading black square
+        let beforeRow = startRow, beforeCol = startCol;
+        if (direction === 'across') beforeCol = startCol - 1;
+        else beforeRow = startRow - 1;
+        
+        if (this.isValidCell(beforeRow, beforeCol)) {
+            const beforeCell = this.grid[beforeRow][beforeCol];
+            if (beforeCell.isBlack) {
+                // Check if any other word needs this black square
+                const isNeededByOtherWord = this.placedWords.some(w => {
+                    let otherBeforeRow = w.startRow, otherBeforeCol = w.startCol;
+                    if (w.direction === 'across') otherBeforeCol = w.startCol - 1;
+                    else otherBeforeRow = w.startRow - 1;
+                    return otherBeforeRow === beforeRow && otherBeforeCol === beforeCol;
+                });
+                
+                if (!isNeededByOtherWord) {
+                    beforeCell.isBlack = false;
+                    beforeCell.element.classList.remove('black');
+                }
+            }
+        }
+    }
+
     isValidCell(row, col) {
         return row >= 0 && row < this.gridSize && col >= 0 && col < this.gridSize;
     }
