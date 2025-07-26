@@ -630,26 +630,16 @@ class CrosswordBuilder {
     
     // Check sequential across number spacing requirements
     isValidSequentialAcrossSpacing(acrossNumbers, current, currentIndex) {
-        console.log('isValidSequentialAcrossSpacing called with:', {
-            acrossNumbers: acrossNumbers.map(n => n.number),
-            current: current.number,
-            currentIndex: currentIndex
-        });
-        
         // Get all across clue numbers that exist
         const allAcrossNumbers = this.clues.across.map(c => c.number).sort((a, b) => a - b);
-        console.log('All across numbers:', allAcrossNumbers);
         
         // Find the position of the current number in the sequence
         const currentNumberIndex = allAcrossNumbers.indexOf(current.number);
         if (currentNumberIndex === -1) {
-            console.log('Current number not found in across clues, returning true');
             return true; // Not an across number
         }
         
-        console.log('Current number index in sequence:', currentNumberIndex);
-        
-        // Check if there are missing sequential numbers between current and other numbers in this row
+        // Check spacing with other across numbers in this row
         for (let i = 0; i < acrossNumbers.length; i++) {
             if (i === currentIndex) continue; // Skip the current number
             
@@ -657,49 +647,23 @@ class CrosswordBuilder {
             const otherNumberIndex = allAcrossNumbers.indexOf(otherNumber);
             if (otherNumberIndex === -1) continue; // Not an across number
             
-            console.log('Checking against other number:', otherNumber, 'at index:', otherNumberIndex);
+            // Calculate required spacing using the formula: max(abs(num2 - num1), 3 * abs(ind2 - ind1)) + abs(ind2 - ind1)
+            const currentPos = acrossNumbers[currentIndex].col;
+            const otherPos = acrossNumbers[i].col;
+            const minPos = Math.min(currentPos, otherPos);
+            const maxPos = Math.max(currentPos, otherPos);
+            const availableSpace = maxPos - minPos; // Space between positions
             
-            // Find all missing sequential numbers between current and other
-            const minIndex = Math.min(currentNumberIndex, otherNumberIndex);
-            const maxIndex = Math.max(currentNumberIndex, otherNumberIndex);
-            const missingNumbers = [];
+            const currentNumber = acrossNumbers[currentIndex].number;
+            const numDiff = Math.abs(otherNumber - currentNumber);
+            const indexDiff = Math.abs(otherNumberIndex - currentNumberIndex);
+            const requiredSpacing = Math.max(numDiff, 3 * indexDiff) + indexDiff;
             
-            for (let j = minIndex + 1; j < maxIndex; j++) {
-                const missingNumber = allAcrossNumbers[j];
-                // Check if this missing number is not already placed in this row
-                const isMissingInRow = !acrossNumbers.some(n => n.number === missingNumber);
-                if (isMissingInRow) {
-                    missingNumbers.push(missingNumber);
-                }
+            if (availableSpace < requiredSpacing) {
+                return false;
             }
-            
-            console.log('Missing numbers between', current.number, 'and', otherNumber, ':', missingNumbers);
-            
-                            // Calculate required spacing using the new formula
-                const currentPos = acrossNumbers[currentIndex].col;
-                const otherPos = acrossNumbers[i].col;
-                const minPos = Math.min(currentPos, otherPos);
-                const maxPos = Math.max(currentPos, otherPos);
-                const availableSpace = maxPos - minPos; // Space between positions
-                
-                // Calculate required spacing using the new formula
-                const currentNumber = acrossNumbers[currentIndex].number;
-                
-                // Calculate required spacing: max(abs(num2 - num1), 3 * abs(ind2 - ind1)) + abs(ind2 - ind1)
-                const numDiff = Math.abs(otherNumber - currentNumber);
-                const indexDiff = Math.abs(otherNumberIndex - currentNumberIndex);
-                const requiredSpacing = Math.max(numDiff, 3 * indexDiff) + indexDiff;
-                
-                console.log('Required spacing:', requiredSpacing, 'for numbers', currentNumber, 'and', otherNumber);
-                console.log('Available space:', availableSpace, 'between positions', minPos, 'and', maxPos);
-                
-                if (availableSpace < requiredSpacing) {
-                    console.log('Not enough space! Available:', availableSpace, 'Needed:', requiredSpacing);
-                    return false;
-                }
         }
         
-        console.log('Sequential spacing validation passed');
         return true;
     }
     
@@ -1172,8 +1136,8 @@ class CrosswordBuilder {
         // Update number colors for duplicates
         this.updateNumberColors();
         this.updateClueOnGridStates();
-        this.detectAndFillIslands();
-        this.detectAndFillIslands();
+        // this.detectAndFillIslands(); // Temporarily disabled for debugging
+        // this.detectAndFillIslands(); // Temporarily disabled for debugging
     }
 
     updateNumberColors() {
@@ -1689,7 +1653,7 @@ class CrosswordBuilder {
         });
         this.updateNumberColors();
         this.updateClueOnGridStates();
-        this.detectAndFillIslands();
+        // this.detectAndFillIslands(); // Temporarily disabled for debugging
     }
 
     // Helper to update clue visual state for on-grid answers
