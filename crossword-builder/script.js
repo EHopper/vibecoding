@@ -469,7 +469,7 @@ class CrosswordBuilder {
         // Add the new number to the list for validation
         numberedCells.push({ row: row, col: col, number: number });
         
-        // Check each row for monotonic ordering
+        // Check each row for monotonic ordering (left to right)
         for (let r = 0; r < this.gridSize; r++) {
             const rowNumbers = numberedCells.filter(cell => cell.row === r).sort((a, b) => a.col - b.col);
             for (let i = 1; i < rowNumbers.length; i++) {
@@ -479,31 +479,32 @@ class CrosswordBuilder {
             }
         }
         
-        // Check that numbers in each row are smaller than those above and larger than those below
+        // Check cross-row ordering rules
         for (let r = 0; r < this.gridSize; r++) {
-            const rowNumbers = numberedCells.filter(cell => cell.row === r);
-            for (let r2 = 0; r2 < this.gridSize; r2++) {
-                if (r2 === r) continue;
-                const otherRowNumbers = numberedCells.filter(cell => cell.row === r2);
-                
-                // Check if any number in this row is not smaller than numbers above
-                if (r2 < r) { // Other row is above
-                    for (const num1 of rowNumbers) {
-                        for (const num2 of otherRowNumbers) {
-                            if (num1.number >= num2.number) {
-                                return false;
-                            }
-                        }
+            const rowNumbers = numberedCells.filter(cell => cell.row === r).sort((a, b) => a.col - b.col);
+            if (rowNumbers.length === 0) continue;
+            
+            const smallestInRow = rowNumbers[0].number;
+            const largestInRow = rowNumbers[rowNumbers.length - 1].number;
+            
+            // Check against row above
+            if (r > 0) {
+                const rowAboveNumbers = numberedCells.filter(cell => cell.row === r - 1).sort((a, b) => a.col - b.col);
+                if (rowAboveNumbers.length > 0) {
+                    const largestInRowAbove = rowAboveNumbers[rowAboveNumbers.length - 1].number;
+                    if (smallestInRow <= largestInRowAbove) {
+                        return false; // Smallest number in this row must be larger than largest in row above
                     }
                 }
-                // Check if any number in this row is not larger than numbers below
-                if (r2 > r) { // Other row is below
-                    for (const num1 of rowNumbers) {
-                        for (const num2 of otherRowNumbers) {
-                            if (num1.number <= num2.number) {
-                                return false;
-                            }
-                        }
+            }
+            
+            // Check against row below
+            if (r < this.gridSize - 1) {
+                const rowBelowNumbers = numberedCells.filter(cell => cell.row === r + 1).sort((a, b) => a.col - b.col);
+                if (rowBelowNumbers.length > 0) {
+                    const smallestInRowBelow = rowBelowNumbers[0].number;
+                    if (largestInRow >= smallestInRowBelow) {
+                        return false; // Largest number in this row must be smaller than smallest in row below
                     }
                 }
             }
