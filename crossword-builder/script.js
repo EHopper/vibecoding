@@ -10,6 +10,7 @@ class CrosswordBuilder {
         // Track black squares by their source
         this.blackPreceding = new Set(); // Black squares from number placement (preceding constraints)
         this.blackTerminal = new Set();  // Black squares from answer placement (terminal constraints)
+        this.blackIsland = new Set();    // Black squares from island detection (isolated/unusable areas)
         
         this.init();
     }
@@ -204,6 +205,12 @@ class CrosswordBuilder {
                 const userAnswer = prompt(promptMsg);
                 const answer = userAnswer ? userAnswer.toUpperCase().trim() : '';
                 if (userAnswer !== null) {
+                    // Validate answer length (must be at least 3 letters)
+                    if (answer !== '' && answer.replace(/\s+/g, '').length < 3) {
+                        alert('Answers must be at least 3 letters long.');
+                        return;
+                    }
+                    
                     // Check if the number is already on the grid
                     let numberOnGrid = false;
                     let gridRow = -1, gridCol = -1;
@@ -334,19 +341,32 @@ class CrosswordBuilder {
                 let canPlacePreceding = true;
                 if (acrossClue) {
                     // Need black square to the left
-                    if (!this.setBlackSquare(row, col - 1, 'preceding')) {
+                    if (!this.canPlaceBlackSquare(row, col - 1)) {
                         canPlacePreceding = false;
                     }
                 }
                 if (downClue) {
                     // Need black square above
-                    if (!this.setBlackSquare(row - 1, col, 'preceding')) {
+                    if (!this.canPlaceBlackSquare(row - 1, col)) {
                         canPlacePreceding = false;
                     }
                 }
                 
                 if (!canPlacePreceding) {
                     alert('Cannot place number here: required preceding black squares cannot be placed.');
+                    return;
+                }
+                
+                // Check minimum word spacing requirements
+                if (!this.isValidWordSpacing(row, col, number)) {
+                    // Remove the preceding black squares we just added
+                    if (acrossClue) {
+                        this.removeBlackSquare(row, col - 1, 'preceding');
+                    }
+                    if (downClue) {
+                        this.removeBlackSquare(row - 1, col, 'preceding');
+                    }
+                    alert('Cannot assign this number here: minimum word spacing requirements are not met.');
                     return;
                 }
                 
@@ -362,16 +382,18 @@ class CrosswordBuilder {
                     }
                 });
                 if (!canAssign) {
-                    // Remove the preceding black squares we just added
-                    if (acrossClue) {
-                        this.removeBlackSquare(row, col - 1, 'preceding');
-                    }
-                    if (downClue) {
-                        this.removeBlackSquare(row - 1, col, 'preceding');
-                    }
                     alert('Cannot assign this number here: one or more answers for this clue number cannot be placed at this location.');
                     return;
                 }
+                
+                // All validation passed - now actually place the preceding black squares
+                if (acrossClue) {
+                    this.setBlackSquare(row, col - 1, 'preceding');
+                }
+                if (downClue) {
+                    this.setBlackSquare(row - 1, col, 'preceding');
+                }
+                
                 // Label the cell (no answer required)
                 cell.number = number;
                 let numberSpan = cell.element.querySelector('.number');
@@ -505,6 +527,245 @@ class CrosswordBuilder {
                     const smallestInRowBelow = rowBelowNumbers[0].number;
                     if (largestInRow >= smallestInRowBelow) {
                         return false; // Largest number in this row must be smaller than smallest in row below
+                    }
+                }
+            }
+        }
+        
+        return true;
+    }
+    
+    // Check minimum word spacing requirements
+    isValidWordSpacing(row, col, number) {
+        // Check across spacing in this row
+        if (!this.isValidAcrossSpacing(row, col, number)) {
+            return false;
+        }
+        
+        // Check down spacing in this column
+        if (!this.isValidDownSpacing(row, col, number)) {
+            return false;
+        }
+        
+        return true;
+    }
+    
+    // Check across word spacing in a row
+    isValidAcrossSpacing(row, col, number) {
+        // Get all across-relevant numbers in this row
+        const acrossNumbers = [];
+        for (let c = 0; c < this.gridSize; c++) {
+            const cell = this.grid[row][c];
+            if (cell.number && !(c === col)) { // Exclude the cell we're placing
+                const cellNumber = parseInt(cell.number.toString().split(',')[0]);
+                const hasAcrossClue = this.clues.across.find(c => c.number === cellNumber);
+                if (hasAcrossClue) {
+                    acrossNumbers.push({ col: c, number: cellNumber });
+                }
+            }
+        }
+        
+        // Add the new number if it has an across clue
+        const hasNewAcrossClue = this.clues.across.find(c => c.number === number);
+        if (hasNewAcrossClue) {
+            acrossNumbers.push({ col: col, number: number });
+        }
+        
+        // If no across numbers in this row, validation passes
+        if (acrossNumbers.length === 0) {
+            return true;
+        }
+        
+        // Sort by column position
+        acrossNumbers.sort((a, b) => a.col - b.col);
+        
+        // Check spacing between all across numbers
+        for (let i = 0; i < acrossNumbers.length; i++) {
+            const current = acrossNumbers[i];
+            if (current.number === number) {
+                // Check spacing with previous across word
+                if (i > 0) {
+                    const prev = acrossNumbers[i - 1];
+                    const prevAcrossClue = this.clues.across.find(c => c.number === prev.number);
+                    let minSpacing = 4; // Default minimum: 3 letters + 1 black square
+                    if (prevAcrossClue && prevAcrossClue.userAnswer) {
+                        const prevWordLength = prevAcrossClue.userAnswer.replace(/\s+/g, '').length;
+                        minSpacing = Math.max(prevWordLength + 1, 4);
+                    }
+                    const actualSpacing = current.col - prev.col;
+                    if (actualSpacing < minSpacing) {
+                        return false;
+                    }
+                }
+                
+                // Check spacing with next across word
+                if (i < acrossNumbers.length - 1) {
+                    const next = acrossNumbers[i + 1];
+                    const nextAcrossClue = this.clues.across.find(c => c.number === next.number);
+                    if (nextAcrossClue && nextAcrossClue.userAnswer) {
+                        const currentAcrossClue = this.clues.across.find(c => c.number === current.number);
+                        let minSpacing = 4; // Default minimum: 3 letters + 1 black square
+                        if (currentAcrossClue && currentAcrossClue.userAnswer) {
+                            const currentWordLength = currentAcrossClue.userAnswer.replace(/\s+/g, '').length;
+                            minSpacing = Math.max(currentWordLength + 1, 4);
+                        }
+                        const actualSpacing = next.col - current.col;
+                        if (actualSpacing < minSpacing) {
+                            return false;
+                        }
+                    }
+                }
+                
+                // Check sequential across number requirements
+                console.log('Checking sequential spacing for number:', number, 'in row:', row);
+                if (!this.isValidSequentialAcrossSpacing(acrossNumbers, current, i)) {
+                    console.log('Sequential spacing validation failed for number:', number);
+                    return false;
+                }
+            }
+        }
+        
+        return true;
+    }
+    
+    // Check sequential across number spacing requirements
+    isValidSequentialAcrossSpacing(acrossNumbers, current, currentIndex) {
+        console.log('isValidSequentialAcrossSpacing called with:', {
+            acrossNumbers: acrossNumbers.map(n => n.number),
+            current: current.number,
+            currentIndex: currentIndex
+        });
+        
+        // Get all across clue numbers that exist
+        const allAcrossNumbers = this.clues.across.map(c => c.number).sort((a, b) => a - b);
+        console.log('All across numbers:', allAcrossNumbers);
+        
+        // Find the position of the current number in the sequence
+        const currentNumberIndex = allAcrossNumbers.indexOf(current.number);
+        if (currentNumberIndex === -1) {
+            console.log('Current number not found in across clues, returning true');
+            return true; // Not an across number
+        }
+        
+        console.log('Current number index in sequence:', currentNumberIndex);
+        
+        // Check if there are missing sequential numbers between current and other numbers in this row
+        for (let i = 0; i < acrossNumbers.length; i++) {
+            if (i === currentIndex) continue; // Skip the current number
+            
+            const otherNumber = acrossNumbers[i].number;
+            const otherNumberIndex = allAcrossNumbers.indexOf(otherNumber);
+            if (otherNumberIndex === -1) continue; // Not an across number
+            
+            console.log('Checking against other number:', otherNumber, 'at index:', otherNumberIndex);
+            
+            // Find all missing sequential numbers between current and other
+            const minIndex = Math.min(currentNumberIndex, otherNumberIndex);
+            const maxIndex = Math.max(currentNumberIndex, otherNumberIndex);
+            const missingNumbers = [];
+            
+            for (let j = minIndex + 1; j < maxIndex; j++) {
+                const missingNumber = allAcrossNumbers[j];
+                // Check if this missing number is not already placed in this row
+                const isMissingInRow = !acrossNumbers.some(n => n.number === missingNumber);
+                if (isMissingInRow) {
+                    missingNumbers.push(missingNumber);
+                }
+            }
+            
+            console.log('Missing numbers between', current.number, 'and', otherNumber, ':', missingNumbers);
+            
+                            // Calculate required spacing using the new formula
+                const currentPos = acrossNumbers[currentIndex].col;
+                const otherPos = acrossNumbers[i].col;
+                const minPos = Math.min(currentPos, otherPos);
+                const maxPos = Math.max(currentPos, otherPos);
+                const availableSpace = maxPos - minPos; // Space between positions
+                
+                // Calculate required spacing using the new formula
+                const currentNumber = acrossNumbers[currentIndex].number;
+                
+                // Calculate required spacing: max(abs(num2 - num1), 3 * abs(ind2 - ind1)) + abs(ind2 - ind1)
+                const numDiff = Math.abs(otherNumber - currentNumber);
+                const indexDiff = Math.abs(otherNumberIndex - currentNumberIndex);
+                const requiredSpacing = Math.max(numDiff, 3 * indexDiff) + indexDiff;
+                
+                console.log('Required spacing:', requiredSpacing, 'for numbers', currentNumber, 'and', otherNumber);
+                console.log('Available space:', availableSpace, 'between positions', minPos, 'and', maxPos);
+                
+                if (availableSpace < requiredSpacing) {
+                    console.log('Not enough space! Available:', availableSpace, 'Needed:', requiredSpacing);
+                    return false;
+                }
+        }
+        
+        console.log('Sequential spacing validation passed');
+        return true;
+    }
+    
+    // Check down word spacing in a column
+    isValidDownSpacing(row, col, number) {
+        // Get all down-relevant numbers in this column
+        const downNumbers = [];
+        for (let r = 0; r < this.gridSize; r++) {
+            const cell = this.grid[r][col];
+            if (cell.number && !(r === row)) { // Exclude the cell we're placing
+                const cellNumber = parseInt(cell.number.toString().split(',')[0]);
+                const hasDownClue = this.clues.down.find(c => c.number === cellNumber);
+                if (hasDownClue) {
+                    downNumbers.push({ row: r, number: cellNumber });
+                }
+            }
+        }
+        
+        // Add the new number if it has a down clue
+        const hasNewDownClue = this.clues.down.find(c => c.number === number);
+        if (hasNewDownClue) {
+            downNumbers.push({ row: row, number: number });
+        }
+        
+        // If no down numbers in this column, validation passes
+        if (downNumbers.length === 0) {
+            return true;
+        }
+        
+        // Sort by row position
+        downNumbers.sort((a, b) => a.row - b.row);
+        
+        // Check spacing between all down numbers
+        for (let i = 0; i < downNumbers.length; i++) {
+            const current = downNumbers[i];
+            if (current.number === number) {
+                // Check spacing with previous down word
+                if (i > 0) {
+                    const prev = downNumbers[i - 1];
+                    const prevDownClue = this.clues.down.find(c => c.number === prev.number);
+                    let minSpacing = 4; // Default minimum: 3 letters + 1 black square
+                    if (prevDownClue && prevDownClue.userAnswer) {
+                        const prevWordLength = prevDownClue.userAnswer.replace(/\s+/g, '').length;
+                        minSpacing = Math.max(prevWordLength + 1, 4);
+                    }
+                    const actualSpacing = current.row - prev.row;
+                    if (actualSpacing < minSpacing) {
+                        return false;
+                    }
+                }
+                
+                // Check spacing with next down word
+                if (i < downNumbers.length - 1) {
+                    const next = downNumbers[i + 1];
+                    const nextDownClue = this.clues.down.find(c => c.number === next.number);
+                    if (nextDownClue && nextDownClue.userAnswer) {
+                        const currentDownClue = this.clues.down.find(c => c.number === current.number);
+                        let minSpacing = 4; // Default minimum: 3 letters + 1 black square
+                        if (currentDownClue && currentDownClue.userAnswer) {
+                            const currentWordLength = currentDownClue.userAnswer.replace(/\s+/g, '').length;
+                            minSpacing = Math.max(currentWordLength + 1, 4);
+                        }
+                        const actualSpacing = next.row - current.row;
+                        if (actualSpacing < minSpacing) {
+                            return false;
+                        }
                     }
                 }
             }
@@ -911,6 +1172,8 @@ class CrosswordBuilder {
         // Update number colors for duplicates
         this.updateNumberColors();
         this.updateClueOnGridStates();
+        this.detectAndFillIslands();
+        this.detectAndFillIslands();
     }
 
     updateNumberColors() {
@@ -1023,6 +1286,8 @@ class CrosswordBuilder {
             this.blackPreceding.add(key);
         } else if (source === 'terminal') {
             this.blackTerminal.add(key);
+        } else if (source === 'island') {
+            this.blackIsland.add(key);
         }
         
         return true;
@@ -1038,14 +1303,145 @@ class CrosswordBuilder {
             this.blackPreceding.delete(key);
         } else if (source === 'terminal') {
             this.blackTerminal.delete(key);
+        } else if (source === 'island') {
+            this.blackIsland.delete(key);
         }
         
         // Only remove if no other source requires this cell to be black
-        if (!this.blackPreceding.has(key) && !this.blackTerminal.has(key)) {
+        if (!this.blackPreceding.has(key) && !this.blackTerminal.has(key) && !this.blackIsland.has(key)) {
             cell.isBlack = false;
             cell.blackSource = null;
             cell.element.classList.remove('black');
         }
+    }
+    
+    canPlaceBlackSquare(row, col) {
+        if (!this.isValidCell(row, col)) return false;
+        
+        const cell = this.grid[row][col];
+        if (cell.letter) return false; // Can't make a cell with a letter black
+        
+        return true;
+    }
+    
+    // Detect and fill isolated white squares (islands)
+    detectAndFillIslands() {
+        // Clear previous island black squares
+        this.blackIsland.clear();
+        
+        // Find all white squares
+        const whiteSquares = [];
+        for (let r = 0; r < this.gridSize; r++) {
+            for (let c = 0; c < this.gridSize; c++) {
+                const cell = this.grid[r][c];
+                if (!cell.isBlack && !cell.letter) {
+                    whiteSquares.push({ row: r, col: c });
+                }
+            }
+        }
+        
+        // Find connected components of white squares
+        const visited = new Set();
+        const islands = [];
+        
+        for (const square of whiteSquares) {
+            const key = `${square.row},${square.col}`;
+            if (!visited.has(key)) {
+                const island = this.findConnectedWhiteSquares(square.row, square.col, visited);
+                if (island.length > 0) {
+                    islands.push(island);
+                }
+            }
+        }
+        
+        // Check each island and fill if necessary
+        for (const island of islands) {
+            if (this.shouldFillIsland(island)) {
+                for (const square of island) {
+                    this.setBlackSquare(square.row, square.col, 'island');
+                }
+            }
+        }
+    }
+    
+    // Find all white squares connected to the given square
+    findConnectedWhiteSquares(startRow, startCol, visited) {
+        const island = [];
+        const queue = [{ row: startRow, col: startCol }];
+        
+        while (queue.length > 0) {
+            const current = queue.shift();
+            const key = `${current.row},${current.col}`;
+            
+            if (visited.has(key)) continue;
+            visited.add(key);
+            
+            const cell = this.grid[current.row][current.col];
+            if (cell.isBlack || cell.letter) continue;
+            
+            island.push(current);
+            
+            // Check adjacent squares (up, down, left, right)
+            const directions = [
+                { row: -1, col: 0 }, { row: 1, col: 0 },
+                { row: 0, col: -1 }, { row: 0, col: 1 }
+            ];
+            
+            for (const dir of directions) {
+                const newRow = current.row + dir.row;
+                const newCol = current.col + dir.col;
+                const newKey = `${newRow},${newCol}`;
+                
+                if (this.isValidCell(newRow, newCol) && !visited.has(newKey)) {
+                    const adjacentCell = this.grid[newRow][newCol];
+                    if (!adjacentCell.isBlack && !adjacentCell.letter) {
+                        queue.push({ row: newRow, col: newCol });
+                    }
+                }
+            }
+        }
+        
+        return island;
+    }
+    
+    // Check if an island should be filled (too small or isolated)
+    shouldFillIsland(island) {
+        if (island.length === 0) return false;
+        
+        // Check if island is too small (less than 3 squares)
+        if (island.length < 3) return true;
+        
+        // Check if island is too narrow (less than 3 squares wide or tall)
+        const rows = new Set(island.map(s => s.row));
+        const cols = new Set(island.map(s => s.col));
+        
+        if (rows.size < 3 && cols.size < 3) return true;
+        
+        // Check if island is completely isolated (no adjacent white squares outside island)
+        for (const square of island) {
+            const directions = [
+                { row: -1, col: 0 }, { row: 1, col: 0 },
+                { row: 0, col: -1 }, { row: 0, col: 1 }
+            ];
+            
+            for (const dir of directions) {
+                const newRow = square.row + dir.row;
+                const newCol = square.col + dir.col;
+                
+                if (this.isValidCell(newRow, newCol)) {
+                    const adjacentCell = this.grid[newRow][newCol];
+                    if (!adjacentCell.isBlack && !adjacentCell.letter) {
+                        // Check if this adjacent square is outside the island
+                        const isOutsideIsland = !island.some(s => s.row === newRow && s.col === newCol);
+                        if (isOutsideIsland) {
+                            return false; // Island is not completely isolated
+                        }
+                    }
+                }
+            }
+        }
+        
+        return true; // Island is completely isolated
     }
     
     updateCellBlackState(row, col) {
@@ -1054,11 +1450,11 @@ class CrosswordBuilder {
         const cell = this.grid[row][col];
         const key = `${row},${col}`;
         
-        const shouldBeBlack = this.blackPreceding.has(key) || this.blackTerminal.has(key);
+        const shouldBeBlack = this.blackPreceding.has(key) || this.blackTerminal.has(key) || this.blackIsland.has(key);
         
         if (shouldBeBlack && !cell.isBlack) {
             cell.isBlack = true;
-            cell.blackSource = this.blackPreceding.has(key) ? 'preceding' : 'terminal';
+            cell.blackSource = this.blackPreceding.has(key) ? 'preceding' : (this.blackTerminal.has(key) ? 'terminal' : 'island');
             cell.element.classList.add('black');
             cell.element.innerHTML = '';
             cell.letter = null;
@@ -1293,6 +1689,7 @@ class CrosswordBuilder {
         });
         this.updateNumberColors();
         this.updateClueOnGridStates();
+        this.detectAndFillIslands();
     }
 
     // Helper to update clue visual state for on-grid answers
