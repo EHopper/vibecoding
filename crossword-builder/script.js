@@ -7,6 +7,10 @@ class CrosswordBuilder {
         this.clues = { across: [], down: [] };
         this.solvedClues = new Set();
         
+        // Track black squares by their source
+        this.blackPreceding = new Set(); // Black squares from number placement (preceding constraints)
+        this.blackTerminal = new Set();  // Black squares from answer placement (terminal constraints)
+        
         this.init();
     }
     
@@ -38,6 +42,7 @@ class CrosswordBuilder {
                     letter: null,
                     number: null,
                     isBlack: false,
+                    blackSource: null, // 'preceding' or 'terminal' or null
                     words: [] // Track which words use this cell
                 };
             }
@@ -321,6 +326,30 @@ class CrosswordBuilder {
                         }
                     }
                 }
+                // Check if this number has associated clues
+                const acrossClue = this.clues.across.find(c => c.number === number);
+                const downClue = this.clues.down.find(c => c.number === number);
+                
+                // Check if we can place the required preceding black squares
+                let canPlacePreceding = true;
+                if (acrossClue) {
+                    // Need black square to the left
+                    if (!this.setBlackSquare(row, col - 1, 'preceding')) {
+                        canPlacePreceding = false;
+                    }
+                }
+                if (downClue) {
+                    // Need black square above
+                    if (!this.setBlackSquare(row - 1, col, 'preceding')) {
+                        canPlacePreceding = false;
+                    }
+                }
+                
+                if (!canPlacePreceding) {
+                    alert('Cannot place number here: required preceding black squares cannot be placed.');
+                    return;
+                }
+                
                 // Before labeling the cell, check if any existing answers for this number cannot be placed here
                 let canAssign = true;
                 ['across', 'down'].forEach(direction => {
@@ -333,6 +362,13 @@ class CrosswordBuilder {
                     }
                 });
                 if (!canAssign) {
+                    // Remove the preceding black squares we just added
+                    if (acrossClue) {
+                        this.removeBlackSquare(row, col - 1, 'preceding');
+                    }
+                    if (downClue) {
+                        this.removeBlackSquare(row - 1, col, 'preceding');
+                    }
                     alert('Cannot assign this number here: one or more answers for this clue number cannot be placed at this location.');
                     return;
                 }
@@ -386,6 +422,17 @@ class CrosswordBuilder {
                     // Remove down answer if present
                     const downWord = this.placedWords.find(w => w.number === number && w.direction === 'down' && w.startRow === row && w.startCol === col);
                     if (downWord) this.removeWord(row, col, 'down');
+                    
+                    // Remove preceding black squares associated with this number
+                    const acrossClue = this.clues.across.find(c => c.number === number);
+                    const downClue = this.clues.down.find(c => c.number === number);
+                    if (acrossClue) {
+                        this.removeBlackSquare(row, col - 1, 'preceding');
+                    }
+                    if (downClue) {
+                        this.removeBlackSquare(row - 1, col, 'preceding');
+                    }
+                    
                     // Remove number label
                     cell.number = null;
                     const numberSpan = cell.element.querySelector('.number');
@@ -901,15 +948,12 @@ class CrosswordBuilder {
     // Removed markWordAsPlaced and unmarkWordAsPlaced function definitions and all calls to them throughout the file.
 
     removeWord(startRow, startCol, directionOverride) {
-        console.log('removeWord called with:', startRow, startCol, directionOverride);
         // Find the word to remove
         const wordIndex = this.placedWords.findIndex(w =>
             w.startRow === startRow && w.startCol === startCol && (!directionOverride || w.direction === directionOverride)
         );
-        console.log('Found word at index:', wordIndex, 'total placed words:', this.placedWords.length);
         if (wordIndex !== -1) {
             const word = this.placedWords[wordIndex];
-            console.log('Removing word:', word.word, 'from grid');
             // Remove letters and word tracking
             for (let i = 0; i < word.word.length; i++) {
                 let row = startRow;
@@ -936,8 +980,13 @@ class CrosswordBuilder {
             // Remove the word from placed words
             this.placedWords.splice(wordIndex, 1);
             
-            // Check for black squares that can be removed
-            this.checkAndRemoveBlackSquares(startRow, startCol, word.direction, word.word.length);
+            // Remove terminal black square after the word
+            let endRow = startRow, endCol = startCol;
+            if (word.direction === 'across') endCol = startCol + word.word.length;
+            else endRow = startRow + word.word.length;
+            if (this.isValidCell(endRow, endCol)) {
+                this.removeBlackSquare(endRow, endCol, 'terminal');
+            }
             
             // Don't remove the number from the grid - numbers should only be removed by explicit grid interaction
             // The number stays on the grid even when words are removed
@@ -946,57 +995,79 @@ class CrosswordBuilder {
         }
     }
     
-    // New method to check and remove black squares only if not needed by other words
-    checkAndRemoveBlackSquares(startRow, startCol, direction, wordLength) {
-        // Check trailing black square
-        let endRow = startRow, endCol = startCol;
-        if (direction === 'across') endCol = startCol + wordLength;
-        else endRow = startRow + wordLength;
-        
-        if (this.isValidCell(endRow, endCol)) {
-            const endCell = this.grid[endRow][endCol];
-            if (endCell.isBlack) {
-                // Check if any other word needs this black square
-                const isNeededByOtherWord = this.placedWords.some(w => {
-                    let otherEndRow = w.startRow, otherEndCol = w.startCol;
-                    if (w.direction === 'across') otherEndCol = w.startCol + w.word.length;
-                    else otherEndRow = w.startRow + w.word.length;
-                    return otherEndRow === endRow && otherEndCol === endCol;
-                });
-                
-                if (!isNeededByOtherWord) {
-                    endCell.isBlack = false;
-                    endCell.element.classList.remove('black');
-                }
-            }
-        }
-        
-        // Check leading black square
-        let beforeRow = startRow, beforeCol = startCol;
-        if (direction === 'across') beforeCol = startCol - 1;
-        else beforeRow = startRow - 1;
-        
-        if (this.isValidCell(beforeRow, beforeCol)) {
-            const beforeCell = this.grid[beforeRow][beforeCol];
-            if (beforeCell.isBlack) {
-                // Check if any other word needs this black square
-                const isNeededByOtherWord = this.placedWords.some(w => {
-                    let otherBeforeRow = w.startRow, otherBeforeCol = w.startCol;
-                    if (w.direction === 'across') otherBeforeCol = w.startCol - 1;
-                    else otherBeforeRow = w.startRow - 1;
-                    return otherBeforeRow === beforeRow && otherBeforeCol === beforeCol;
-                });
-                
-                if (!isNeededByOtherWord) {
-                    beforeCell.isBlack = false;
-                    beforeCell.element.classList.remove('black');
-                }
-            }
-        }
-    }
+
 
     isValidCell(row, col) {
         return row >= 0 && row < this.gridSize && col >= 0 && col < this.gridSize;
+    }
+    
+    // Helper functions for black square management
+    setBlackSquare(row, col, source) {
+        if (!this.isValidCell(row, col)) return false;
+        
+        const cell = this.grid[row][col];
+        if (cell.letter) return false; // Can't make a cell with a letter black
+        
+        cell.isBlack = true;
+        cell.blackSource = source;
+        cell.element.classList.add('black');
+        cell.element.innerHTML = '';
+        cell.letter = null;
+        cell.number = null;
+        cell.words = [];
+        
+        // Add to tracking set
+        const key = `${row},${col}`;
+        if (source === 'preceding') {
+            this.blackPreceding.add(key);
+        } else if (source === 'terminal') {
+            this.blackTerminal.add(key);
+        }
+        
+        return true;
+    }
+    
+    removeBlackSquare(row, col, source) {
+        if (!this.isValidCell(row, col)) return;
+        
+        const cell = this.grid[row][col];
+        const key = `${row},${col}`;
+        
+        if (source === 'preceding') {
+            this.blackPreceding.delete(key);
+        } else if (source === 'terminal') {
+            this.blackTerminal.delete(key);
+        }
+        
+        // Only remove if no other source requires this cell to be black
+        if (!this.blackPreceding.has(key) && !this.blackTerminal.has(key)) {
+            cell.isBlack = false;
+            cell.blackSource = null;
+            cell.element.classList.remove('black');
+        }
+    }
+    
+    updateCellBlackState(row, col) {
+        if (!this.isValidCell(row, col)) return;
+        
+        const cell = this.grid[row][col];
+        const key = `${row},${col}`;
+        
+        const shouldBeBlack = this.blackPreceding.has(key) || this.blackTerminal.has(key);
+        
+        if (shouldBeBlack && !cell.isBlack) {
+            cell.isBlack = true;
+            cell.blackSource = this.blackPreceding.has(key) ? 'preceding' : 'terminal';
+            cell.element.classList.add('black');
+            cell.element.innerHTML = '';
+            cell.letter = null;
+            cell.number = null;
+            cell.words = [];
+        } else if (!shouldBeBlack && cell.isBlack) {
+            cell.isBlack = false;
+            cell.blackSource = null;
+            cell.element.classList.remove('black');
+        }
     }
     
     toggleBlackSquare(cellElement) {
@@ -1202,35 +1273,15 @@ class CrosswordBuilder {
             letterSpan.textContent = word[i];
             cell.element.appendChild(letterSpan);
         }
-        // Autoblock: add a black square before and after the word if possible (and not overlapping a letter)
-        let beforeRow = row, beforeCol = col;
-        if (direction === 'across') beforeCol = col - 1;
-        else beforeRow = row - 1;
-        if (this.isValidCell(beforeRow, beforeCol)) {
-            const beforeCell = this.grid[beforeRow][beforeCol];
-            if (!beforeCell.letter && !beforeCell.isBlack) {
-                beforeCell.isBlack = true;
-                beforeCell.element.classList.add('black');
-                beforeCell.element.innerHTML = '';
-                beforeCell.letter = null;
-                beforeCell.number = null;
-                beforeCell.words = [];
-            }
-        }
+        
+        // Add terminal black square after the word
         let endRow = row, endCol = col;
         if (direction === 'across') endCol = col + word.length;
         else endRow = row + word.length;
         if (this.isValidCell(endRow, endCol)) {
-            const endCell = this.grid[endRow][endCol];
-            if (!endCell.letter && !endCell.isBlack) {
-                endCell.isBlack = true;
-                endCell.element.classList.add('black');
-                endCell.element.innerHTML = '';
-                endCell.letter = null;
-                endCell.number = null;
-                endCell.words = [];
-            }
+            this.setBlackSquare(endRow, endCol, 'terminal');
         }
+        
         // Record placed word
         this.placedWords.push({
             word: word,
