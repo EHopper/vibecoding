@@ -1,6 +1,6 @@
 class CrosswordBuilder {
     constructor() {
-        this.gridSize = 20;
+        this.gridSize = 15; // Default to 15x15
         this.grid = [];
         this.placedWords = [];
         this.selectedWord = null;
@@ -10,7 +10,7 @@ class CrosswordBuilder {
         // Track black squares by their source
         this.blackPreceding = new Set(); // Black squares from number placement (preceding constraints)
         this.blackTerminal = new Set();  // Black squares from answer placement (terminal constraints)
-        this.blackIsland = new Set();    // Black squares from island detection (isolated/unusable areas)
+        this.blackManual = new Set();    // Black squares manually placed by user
         
         this.init();
     }
@@ -20,6 +20,7 @@ class CrosswordBuilder {
         this.createGrid();
         this.loadClues();
         this.setupEventListeners();
+        this.setupGridSizeSelector();
         console.log('CrosswordBuilder initialized');
     }
     
@@ -27,6 +28,24 @@ class CrosswordBuilder {
         console.log('Creating grid...');
         const gridElement = document.getElementById('crossword-grid');
         gridElement.innerHTML = '';
+        
+        // Calculate cell size to fit the grid in a reasonable space
+        const maxGridSize = 600; // Maximum grid width/height in pixels
+        const cellSize = Math.floor(maxGridSize / this.gridSize);
+        
+        // Set the grid template to match the current grid size with calculated cell size
+        gridElement.style.gridTemplateColumns = `repeat(${this.gridSize}, ${cellSize}px)`;
+        gridElement.style.gridTemplateRows = `repeat(${this.gridSize}, ${cellSize}px)`;
+        console.log(`Grid template set to: ${this.gridSize}x${this.gridSize} with ${cellSize}px cells`);
+        
+        // Update clue container heights to match grid height
+        this.updateClueContainerHeights(cellSize);
+        
+        // Store cell size for use in other methods
+        this.currentCellSize = cellSize;
+        
+        // Update font sizes based on cell size
+        this.updateFontSizes(cellSize);
         
         for (let row = 0; row < this.gridSize; row++) {
             this.grid[row] = [];
@@ -51,6 +70,70 @@ class CrosswordBuilder {
         // Log the number of cells created
         const cellCount = gridElement.querySelectorAll('.cell').length;
         console.log('Grid created with', cellCount, 'cells');
+    }
+    
+    setupGridSizeSelector() {
+        const gridSizeSelect = document.getElementById('grid-size');
+        if (gridSizeSelect) {
+            // Set the current grid size in the selector
+            gridSizeSelect.value = this.gridSize.toString();
+            
+            // Add event listener for grid size changes
+            gridSizeSelect.addEventListener('change', (e) => {
+                const newSize = parseInt(e.target.value);
+                if (newSize !== this.gridSize) {
+                    this.changeGridSize(newSize);
+                }
+            });
+        }
+    }
+    
+    changeGridSize(newSize) {
+        // Clear all data
+        this.grid = [];
+        this.placedWords = [];
+        this.selectedWord = null;
+        this.blackPreceding.clear();
+        this.blackTerminal.clear();
+        this.blackManual.clear();
+        
+        // Update grid size
+        this.gridSize = newSize;
+        
+        // Recreate the grid
+        this.createGrid();
+        
+        // Update clue container heights
+        this.updateClueContainerHeights();
+        
+        console.log(`Grid size changed to ${newSize}x${newSize}`);
+    }
+    
+    updateClueContainerHeights(cellSize = 30) {
+        const gridHeight = this.gridSize * cellSize + 20; // cellSize per cell + 20px padding
+        const acrossClues = document.getElementById('across-clues');
+        const downClues = document.getElementById('down-clues');
+        
+        if (acrossClues) {
+            acrossClues.style.height = `${gridHeight}px`;
+            console.log(`Set across clues height to ${gridHeight}px`);
+        }
+        if (downClues) {
+            downClues.style.height = `${gridHeight}px`;
+            console.log(`Set down clues height to ${gridHeight}px`);
+        }
+    }
+    
+    updateFontSizes(cellSize) {
+        // Calculate font sizes based on cell size
+        const letterFontSize = Math.max(8, Math.min(16, cellSize * 0.4));
+        const numberFontSize = Math.max(8, Math.min(14, cellSize * 0.3));
+        
+        // Update CSS custom properties
+        document.documentElement.style.setProperty('--letter-font-size', `${letterFontSize}px`);
+        document.documentElement.style.setProperty('--number-font-size', `${numberFontSize}px`);
+        
+        console.log(`Updated font sizes: letters=${letterFontSize}px, numbers=${numberFontSize}px`);
     }
     
     async loadClues() {
@@ -309,6 +392,43 @@ class CrosswordBuilder {
                 const row = parseInt(cellElement.dataset.row);
                 const col = parseInt(cellElement.dataset.col);
                 const cell = this.grid[row][col];
+                
+                // If cell already has a number, offer to remove it
+                if (cell.number) {
+                    const number = parseInt(cell.number.toString().split(',')[0]);
+                    const remove = confirm(`Remove number ${number} from this cell?`);
+                    if (remove) {
+                        // Remove across answer if present
+                        const acrossWord = this.placedWords.find(w => w.number === number && w.direction === 'across' && w.startRow === row && w.startCol === col);
+                        if (acrossWord) this.removeWord(row, col, 'across');
+                        // Remove down answer if present
+                        const downWord = this.placedWords.find(w => w.number === number && w.direction === 'down' && w.startRow === row && w.startCol === col);
+                        if (downWord) this.removeWord(row, col, 'down');
+                        
+                        // Remove preceding black squares associated with this number
+                        const acrossClue = this.clues.across.find(c => c.number === number);
+                        const downClue = this.clues.down.find(c => c.number === number);
+                        if (acrossClue) {
+                            this.removeBlackSquare(row, col - 1, 'preceding');
+                        }
+                        if (downClue) {
+                            this.removeBlackSquare(row - 1, col, 'preceding');
+                        }
+                        
+                        // Remove number label
+                        cell.number = null;
+                        const numberSpan = cell.element.querySelector('.number');
+                        if (numberSpan) numberSpan.remove();
+                        this.updateNumberColors();
+                        this.updateClueOnGridStates();
+                        
+                        // Log grid state after removing number
+                        // this.logGridState();
+                        // this.logGridArray();
+                    }
+                    return;
+                }
+                
                 // Prompt for clue number
                 let number = prompt('Enter the clue number to place here:');
                 if (!number) return;
@@ -422,9 +542,14 @@ class CrosswordBuilder {
                         }
                     }
                 });
+                
+                // Log grid state after placing number
+                // this.logGridState();
+                // this.logGridArray();
             }
-        });
-        // Right-click to remove number and answers
+                });
+        
+        // Right-click context menu for grid operations
         document.addEventListener('contextmenu', (e) => {
             let cellElement = e.target;
             while (cellElement && !cellElement.classList.contains('cell')) {
@@ -432,43 +557,16 @@ class CrosswordBuilder {
             }
             if (cellElement && cellElement.classList.contains('cell')) {
                 e.preventDefault();
-                const row = parseInt(cellElement.dataset.row);
-                const col = parseInt(cellElement.dataset.col);
-                const cell = this.grid[row][col];
-                // If the cell has a number, remove answers and number as before
-                if (cell.number) {
-                    const number = parseInt(cell.number.toString().split(',')[0]);
-                    // Remove across answer if present
-                    const acrossWord = this.placedWords.find(w => w.number === number && w.direction === 'across' && w.startRow === row && w.startCol === col);
-                    if (acrossWord) this.removeWord(row, col, 'across');
-                    // Remove down answer if present
-                    const downWord = this.placedWords.find(w => w.number === number && w.direction === 'down' && w.startRow === row && w.startCol === col);
-                    if (downWord) this.removeWord(row, col, 'down');
-                    
-                    // Remove preceding black squares associated with this number
-                    const acrossClue = this.clues.across.find(c => c.number === number);
-                    const downClue = this.clues.down.find(c => c.number === number);
-                    if (acrossClue) {
-                        this.removeBlackSquare(row, col - 1, 'preceding');
-                    }
-                    if (downClue) {
-                        this.removeBlackSquare(row - 1, col, 'preceding');
-                    }
-                    
-                    // Remove number label
-                    cell.number = null;
-                    const numberSpan = cell.element.querySelector('.number');
-                    if (numberSpan) numberSpan.remove();
-                    this.updateNumberColors();
-                    this.updateClueOnGridStates();
-                } else {
-                    // Toggle black/white square
-                    this.toggleBlackSquare(cellElement);
-                }
+                this.showGridContextMenu(e, cellElement);
             }
         });
         
-
+        // Hide context menu when clicking elsewhere
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.context-menu')) {
+                this.hideContextMenu();
+            }
+        });
         
         console.log('Event listeners set up');
     }
@@ -533,6 +631,568 @@ class CrosswordBuilder {
         }
         
         return true;
+    }
+    
+    showGridContextMenu(e, cellElement) {
+        const row = parseInt(cellElement.dataset.row);
+        const col = parseInt(cellElement.dataset.col);
+        
+        // Check if row/column can be deleted (has content)
+        const canDeleteRow = this.canDeleteRow(row);
+        const canDeleteCol = this.canDeleteColumn(col);
+        
+        // Check if we can insert (find empty row/column)
+        const emptyRowIndex = this.findEmptyRow();
+        const emptyColIndex = this.findEmptyColumn();
+        const canInsertRow = emptyRowIndex !== -1;
+        const canInsertCol = emptyColIndex !== -1;
+        
+        // Additional restrictions for insert operations
+        const isRightmostCol = (col === this.gridSize - 1);
+        const isPenultimateRightCol = (col === this.gridSize - 2);
+        const isBottomRow = (row === this.gridSize - 1);
+        const isPenultimateBottomRow = (row === this.gridSize - 2);
+        
+        // Disable specific insert operations
+        const canInsertRowAbove = canInsertRow && !isBottomRow;
+        const canInsertRowBelow = canInsertRow && !isBottomRow && !isPenultimateBottomRow;
+        const canInsertColLeft = canInsertCol && !isRightmostCol;
+        const canInsertColRight = canInsertCol && !isRightmostCol && !isPenultimateRightCol;
+        
+        // Disable delete operations for edge rows/columns
+        const canDeleteRowOption = canDeleteRow && !isBottomRow;
+        const canDeleteColOption = canDeleteCol && !isRightmostCol;
+        
+        // Create context menu
+        const menu = document.createElement('div');
+        menu.className = 'context-menu';
+        menu.style.position = 'absolute';
+        menu.style.left = e.pageX + 'px';
+        menu.style.top = e.pageY + 'px';
+        menu.style.backgroundColor = 'white';
+        menu.style.border = '1px solid #ccc';
+        menu.style.borderRadius = '4px';
+        menu.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
+        menu.style.zIndex = '1000';
+        menu.style.padding = '4px 0';
+        
+        // Build menu items array, only including enabled options
+        const menuItems = [];
+        
+        // Always include toggle black square at the top
+        menuItems.push({ text: 'Toggle Black Square', action: () => this.toggleManualBlackSquare(cellElement) });
+        
+        if (canInsertRowAbove) {
+            menuItems.push({ text: 'Insert Row Above', action: () => this.insertRow(row) });
+        }
+        if (canInsertRowBelow) {
+            menuItems.push({ text: 'Insert Row Below', action: () => this.insertRow(row + 1) });
+        }
+        if (canInsertColLeft) {
+            menuItems.push({ text: 'Insert Column Left', action: () => this.insertColumn(col) });
+        }
+        if (canInsertColRight) {
+            menuItems.push({ text: 'Insert Column Right', action: () => this.insertColumn(col + 1) });
+        }
+        if (canDeleteRowOption) {
+            menuItems.push({ text: 'Delete Row', action: () => this.deleteRow(row) });
+        }
+        if (canDeleteColOption) {
+            menuItems.push({ text: 'Delete Column', action: () => this.deleteColumn(col) });
+        }
+        
+        menuItems.forEach(item => {
+            const menuItem = document.createElement('div');
+            menuItem.style.padding = '8px 16px';
+            menuItem.style.cursor = 'pointer';
+            menuItem.style.color = '#333';
+            menuItem.style.fontSize = '14px';
+            menuItem.textContent = item.text;
+            
+            menuItem.addEventListener('click', () => {
+                item.action();
+                this.hideContextMenu();
+            });
+            menuItem.addEventListener('mouseenter', () => {
+                menuItem.style.backgroundColor = '#f0f0f0';
+            });
+            menuItem.addEventListener('mouseleave', () => {
+                menuItem.style.backgroundColor = 'white';
+            });
+            
+            menu.appendChild(menuItem);
+        });
+        
+        document.body.appendChild(menu);
+        this.currentContextMenu = menu;
+    }
+    
+    hideContextMenu() {
+        if (this.currentContextMenu) {
+            this.currentContextMenu.remove();
+            this.currentContextMenu = null;
+        }
+    }
+    
+    canDeleteRow(row) {
+        // Check if this is an edge row (top or bottom)
+        const isEdgeRow = (row === 0 || row === this.gridSize - 1);
+        
+        for (let col = 0; col < this.gridSize; col++) {
+            const cell = this.grid[row][col];
+            if (!cell) continue; // Skip undefined cells
+            
+            // If it's an edge row, only allow black squares or empty cells
+            if (isEdgeRow) {
+                if (cell.letter || cell.number) {
+                    return false; // Edge rows can't have letters or numbers
+                }
+                // Black squares and empty cells are allowed for edge rows
+            } else {
+                // For non-edge rows, any content prevents deletion
+                if (cell.letter || cell.number || cell.isBlack) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+    
+    canDeleteColumn(col) {
+        // Check if this is an edge column (leftmost or rightmost)
+        const isEdgeColumn = (col === 0 || col === this.gridSize - 1);
+        
+        for (let row = 0; row < this.gridSize; row++) {
+            const cell = this.grid[row][col];
+            if (!cell) continue; // Skip undefined cells
+            
+            // If it's an edge column, only allow black squares or empty cells
+            if (isEdgeColumn) {
+                if (cell.letter || cell.number) {
+                    return false; // Edge columns can't have letters or numbers
+                }
+                // Black squares and empty cells are allowed for edge columns
+            } else {
+                // For non-edge columns, any content prevents deletion
+                if (cell.letter || cell.number || cell.isBlack) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+    
+    findEmptyRow() {
+        for (let row = this.gridSize - 1; row >= 0; row--) {
+            if (this.canDeleteRow(row)) {
+                return row;
+            }
+        }
+        return -1;
+    }
+    
+    findEmptyColumn() {
+        for (let col = this.gridSize - 1; col >= 0; col--) {
+            if (this.canDeleteColumn(col)) {
+                return col;
+            }
+        }
+        return -1;
+    }
+    
+    insertRow(insertAfterRow) {
+        // Find the rightmost empty row and delete it
+        const emptyRowIndex = this.findEmptyRow();
+        if (emptyRowIndex === -1) return;
+        
+        // Delete the empty row first
+        this.deleteRow(emptyRowIndex);
+        
+        // Now insert the new row at the specified position
+        this.insertRowAt(insertAfterRow);
+    }
+    
+    insertColumn(insertAfterCol) {
+        // Find the rightmost empty column and delete it
+        const emptyColIndex = this.findEmptyColumn();
+        if (emptyColIndex === -1) return;
+        
+        // Delete the empty column first
+        this.deleteColumn(emptyColIndex);
+        
+        // Now insert the new column at the specified position
+        this.insertColumnAt(insertAfterCol);
+    }
+    
+    insertRowAt(rowIndex) {
+        // Check if bottom row is completely empty
+        if (!this.canDeleteRow(this.gridSize - 1)) {
+            alert('Cannot insert row: bottom row is not completely empty');
+            return;
+        }
+        
+        // Update row indices for all content at row >= rowIndex
+        // This already handles the grid array shifting
+        this.updateRowIndices(rowIndex, 1);
+        
+        // Completely rebuild the visual grid
+        this.rebuildVisualGrid();
+        
+        // Recalculate black squares after grid structure change
+        this.recalculateBlackSquares();
+        
+        // Log grid state after grid structure change
+        // this.logGridState();
+        // this.logGridArray();
+    }
+    
+    insertColumnAt(colIndex) {
+        // Check if rightmost column is completely empty
+        if (!this.canDeleteColumn(this.gridSize - 1)) {
+            alert('Cannot insert column: rightmost column is not completely empty');
+            return;
+        }
+        
+        // Update column indices for all content at col >= colIndex
+        // This already handles the grid array shifting
+        this.updateColumnIndices(colIndex, 1);
+        
+        // Completely rebuild the visual grid
+        this.rebuildVisualGrid();
+        
+        // Recalculate black squares after grid structure change
+        this.recalculateBlackSquares();
+        
+        // Log grid state after grid structure change
+        // this.logGridState();
+        // this.logGridArray();
+    }
+    
+    deleteRow(rowIndex) {
+        // Check if row is completely empty
+        if (!this.canDeleteRow(rowIndex)) {
+            alert('Cannot delete row: row is not completely empty');
+            return;
+        }
+        
+        // Update row indices for all content at row > rowIndex (decrement by 1)
+        // This already handles the grid array shifting
+        this.updateRowIndices(rowIndex + 1, -1);
+        
+        // Completely rebuild the visual grid
+        this.rebuildVisualGrid();
+        
+        // Recalculate black squares after grid structure change
+        this.recalculateBlackSquares();
+        
+        // Log grid state after grid structure change
+        // this.logGridState();
+        // this.logGridArray();
+    }
+    
+    deleteColumn(colIndex) {
+        // Check if column is completely empty
+        if (!this.canDeleteColumn(colIndex)) {
+            alert('Cannot delete column: column is not completely empty');
+            return;
+        }
+        
+        // Update column indices for all content at col > colIndex (decrement by 1)
+        // This already handles the grid array shifting
+        this.updateColumnIndices(colIndex + 1, -1);
+        
+        // Completely rebuild the visual grid
+        this.rebuildVisualGrid();
+        
+        // Recalculate black squares after grid structure change
+        this.recalculateBlackSquares();
+        
+        // Log grid state after grid structure change
+        // this.logGridState();
+        // this.logGridArray();
+    }
+    
+    updateGridTemplate() {
+        const gridElement = document.getElementById('crossword-grid');
+        const cellSize = Math.floor(600 / this.gridSize);
+        gridElement.style.gridTemplateColumns = `repeat(${this.gridSize}, ${cellSize}px)`;
+        gridElement.style.gridTemplateRows = `repeat(${this.gridSize}, ${cellSize}px)`;
+        this.updateFontSizes(cellSize);
+    }
+    
+    // Helper method to sync DOM elements with grid array
+    syncGridArrayWithDOM() {
+        const gridElement = document.getElementById('crossword-grid');
+        const domCells = Array.from(gridElement.children);
+        
+        // Create a temporary backup of the current grid content
+        const gridBackup = [];
+        for (let row = 0; row < this.gridSize; row++) {
+            gridBackup[row] = [];
+            for (let col = 0; col < this.gridSize; col++) {
+                const cell = this.grid[row][col];
+                gridBackup[row][col] = {
+                    letter: cell.letter,
+                    number: cell.number,
+                    isBlack: cell.isBlack,
+                    blackSource: cell.blackSource,
+                    words: [...cell.words] // Copy the words array
+                };
+            }
+        }
+        
+        // Update the grid array with new DOM elements while preserving content
+        for (let row = 0; row < this.gridSize; row++) {
+            for (let col = 0; col < this.gridSize; col++) {
+                const domIndex = row * this.gridSize + col;
+                if (domIndex < domCells.length) {
+                    const domCell = domCells[domIndex];
+                    const backup = gridBackup[row][col];
+                    
+                    this.grid[row][col] = {
+                        element: domCell,
+                        letter: backup.letter,
+                        number: backup.number,
+                        isBlack: backup.isBlack,
+                        blackSource: backup.blackSource,
+                        words: backup.words
+                    };
+                    
+                    // Update dataset attributes
+                    domCell.dataset.row = row;
+                    domCell.dataset.col = col;
+                    
+                    // Restore visual content to the DOM element
+                    domCell.innerHTML = ''; // Clear existing content
+                    
+                    if (backup.isBlack) {
+                        domCell.classList.add('black');
+                    } else {
+                        domCell.classList.remove('black');
+                        
+                        if (backup.number) {
+                            const numberSpan = document.createElement('span');
+                            numberSpan.className = 'number';
+                            numberSpan.textContent = backup.number;
+                            domCell.appendChild(numberSpan);
+                        }
+                        
+                        if (backup.letter) {
+                            const letterSpan = document.createElement('span');
+                            letterSpan.className = 'letter';
+                            letterSpan.textContent = backup.letter;
+                            domCell.appendChild(letterSpan);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Update number colors
+        this.updateNumberColors();
+    }
+    
+    updateRowIndices(startRow, offset) {
+        // Update row indices for all content at row >= startRow
+        for (let row = startRow; row < this.gridSize; row++) {
+            for (let col = 0; col < this.gridSize; col++) {
+                const cell = this.grid[row][col];
+                if (cell && cell.element && (cell.letter || cell.number || cell.isBlack)) {
+                    const newRow = row + offset;
+                    cell.element.dataset.row = newRow;
+                    
+                    // Update placed words
+                    this.placedWords.forEach(word => {
+                        if (word.startRow === row) {
+                            word.startRow = newRow;
+                        }
+                    });
+                }
+            }
+        }
+        
+        // Also update the grid array structure if inserting (offset > 0)
+        if (offset > 0) {
+            // Shift rows down in the grid array
+            for (let row = this.gridSize - 1; row >= startRow; row--) {
+                for (let col = 0; col < this.gridSize; col++) {
+                    if (row + offset < this.gridSize) {
+                        this.grid[row + offset][col] = this.grid[row][col];
+                    }
+                }
+            }
+            // Clear the original rows that were shifted
+            for (let row = startRow; row < startRow + offset; row++) {
+                for (let col = 0; col < this.gridSize; col++) {
+                    this.grid[row][col] = {
+                        element: null,
+                        letter: null,
+                        number: null,
+                        isBlack: false,
+                        blackSource: null,
+                        words: []
+                    };
+                }
+            }
+        } else if (offset < 0) {
+            // Shift rows up in the grid array
+            for (let row = startRow; row < this.gridSize; row++) {
+                for (let col = 0; col < this.gridSize; col++) {
+                    if (row + offset >= 0) {
+                        this.grid[row + offset][col] = this.grid[row][col];
+                    }
+                }
+            }
+        }
+        
+        // Update all DOM element positions to match the grid array
+        const gridElement = document.getElementById('crossword-grid');
+        for (let row = 0; row < this.gridSize; row++) {
+            for (let col = 0; col < this.gridSize; col++) {
+                const cell = this.grid[row][col];
+                if (cell && cell.element) {
+                    cell.element.dataset.row = row;
+                    cell.element.dataset.col = col;
+                }
+            }
+        }
+    }
+    
+    updateColumnIndices(startCol, offset) {
+        // Update column indices for all content at col >= startCol
+        for (let row = 0; row < this.gridSize; row++) {
+            for (let col = startCol; col < this.gridSize; col++) {
+                const cell = this.grid[row][col];
+                if (cell && cell.element && (cell.letter || cell.number || cell.isBlack)) {
+                    const newCol = col + offset;
+                    cell.element.dataset.col = newCol;
+                    
+                    // Update placed words
+                    this.placedWords.forEach(word => {
+                        if (word.startCol === col) {
+                            word.startCol = newCol;
+                        }
+                    });
+                }
+            }
+        }
+        
+        // Also update the grid array structure if inserting (offset > 0)
+        if (offset > 0) {
+            // Shift columns right in the grid array
+            for (let row = 0; row < this.gridSize; row++) {
+                for (let col = this.gridSize - 1; col >= startCol; col--) {
+                    if (col + offset < this.gridSize) {
+                        this.grid[row][col + offset] = this.grid[row][col];
+                    }
+                }
+            }
+            // Clear the original columns that were shifted
+            for (let row = 0; row < this.gridSize; row++) {
+                for (let col = startCol; col < startCol + offset; col++) {
+                    this.grid[row][col] = {
+                        element: null,
+                        letter: null,
+                        number: null,
+                        isBlack: false,
+                        blackSource: null,
+                        words: []
+                    };
+                }
+            }
+        } else if (offset < 0) {
+            // Shift columns left in the grid array
+            for (let row = 0; row < this.gridSize; row++) {
+                for (let col = startCol; col < this.gridSize; col++) {
+                    if (col + offset >= 0) {
+                        this.grid[row][col + offset] = this.grid[row][col];
+                    }
+                }
+            }
+        }
+        
+        // Update all DOM element positions to match the grid array
+        const gridElement = document.getElementById('crossword-grid');
+        for (let row = 0; row < this.gridSize; row++) {
+            for (let col = 0; col < this.gridSize; col++) {
+                const cell = this.grid[row][col];
+                if (cell && cell.element) {
+                    cell.element.dataset.row = row;
+                    cell.element.dataset.col = col;
+                }
+            }
+        }
+    }
+    
+    recalculateBlackSquares() {
+        // Store manual black squares before clearing
+        const manualBlackSquares = new Set(this.blackManual);
+        
+        // Clear all black squares except manual ones
+        this.blackPreceding.clear();
+        this.blackTerminal.clear();
+        
+        // Clear visual black squares
+        for (let row = 0; row < this.gridSize; row++) {
+            for (let col = 0; col < this.gridSize; col++) {
+                const cell = this.grid[row][col];
+                if (cell.isBlack) {
+                    cell.isBlack = false;
+                    cell.blackSource = null;
+                    cell.element.classList.remove('black');
+                }
+            }
+        }
+        
+        // Restore manual black squares
+        this.blackManual = manualBlackSquares;
+        for (const key of this.blackManual) {
+            const [row, col] = key.split(',').map(Number);
+            if (this.isValidCell(row, col)) {
+                const cell = this.grid[row][col];
+                if (!cell.letter && !cell.number) {
+                    cell.isBlack = true;
+                    cell.blackSource = 'manual';
+                    cell.element.classList.add('black');
+                    cell.element.innerHTML = '';
+                }
+            }
+        }
+        
+        // Recalculate preceding black squares for all numbers
+        for (let row = 0; row < this.gridSize; row++) {
+            for (let col = 0; col < this.gridSize; col++) {
+                const cell = this.grid[row][col];
+                if (cell.number) {
+                    const number = parseInt(cell.number.toString().split(',')[0]);
+                    const acrossClue = this.clues.across.find(c => c.number === number);
+                    const downClue = this.clues.down.find(c => c.number === number);
+                    
+                    if (acrossClue) {
+                        this.setBlackSquare(row, col - 1, 'preceding');
+                    }
+                    if (downClue) {
+                        this.setBlackSquare(row - 1, col, 'preceding');
+                    }
+                }
+            }
+        }
+        
+        // Recalculate terminal black squares for all placed words
+        for (const word of this.placedWords) {
+            let endRow = word.startRow, endCol = word.startCol;
+            if (word.direction === 'across') {
+                endCol = word.startCol + word.word.length;
+            } else {
+                endRow = word.startRow + word.word.length;
+            }
+            this.setBlackSquare(endRow, endCol, 'terminal');
+        }
+        
+        // Island detection is disabled due to bugs
+        
+        console.log('Black squares recalculated after grid structure change');
+        // this.logGridArray();
     }
     
     // Check minimum word spacing requirements
@@ -1136,8 +1796,9 @@ class CrosswordBuilder {
         // Update number colors for duplicates
         this.updateNumberColors();
         this.updateClueOnGridStates();
-        // this.detectAndFillIslands(); // Temporarily disabled for debugging
-        // this.detectAndFillIslands(); // Temporarily disabled for debugging
+
+        // this.logGridState();
+        // this.logGridArray();
     }
 
     updateNumberColors() {
@@ -1220,6 +1881,10 @@ class CrosswordBuilder {
             // The number stays on the grid even when words are removed
             this.updateNumberColors();
             this.updateClueOnGridStates();
+            
+            // Log grid state after removing word
+            // this.logGridState();
+            // this.logGridArray();
         }
     }
     
@@ -1229,184 +1894,87 @@ class CrosswordBuilder {
         return row >= 0 && row < this.gridSize && col >= 0 && col < this.gridSize;
     }
     
+    isValidBlackSquarePosition(row, col) {
+        // Black squares can extend beyond the grid boundaries
+        return true;
+    }
+    
     // Helper functions for black square management
     setBlackSquare(row, col, source) {
-        if (!this.isValidCell(row, col)) return false;
+        if (!this.isValidBlackSquarePosition(row, col)) return false;
         
-        const cell = this.grid[row][col];
-        if (cell.letter) return false; // Can't make a cell with a letter black
+        // If the position is within the grid, update the cell
+        if (this.isValidCell(row, col)) {
+            const cell = this.grid[row][col];
+            if (cell.letter) return false; // Can't make a cell with a letter black
+            if (cell.number) return false; // Can't make a cell with a number black
+            
+            cell.isBlack = true;
+            cell.blackSource = source;
+            cell.element.classList.add('black');
+            cell.element.innerHTML = '';
+            cell.letter = null;
+            cell.number = null;
+            cell.words = [];
+        }
         
-        cell.isBlack = true;
-        cell.blackSource = source;
-        cell.element.classList.add('black');
-        cell.element.innerHTML = '';
-        cell.letter = null;
-        cell.number = null;
-        cell.words = [];
-        
-        // Add to tracking set
+        // Add to tracking set (even if outside grid)
         const key = `${row},${col}`;
         if (source === 'preceding') {
             this.blackPreceding.add(key);
         } else if (source === 'terminal') {
             this.blackTerminal.add(key);
-        } else if (source === 'island') {
-            this.blackIsland.add(key);
+        } else if (source === 'manual') {
+            this.blackManual.add(key);
         }
         
+        // Log grid state after black square change
+        // this.logGridState();
+        // this.logGridArray();
         return true;
     }
     
     removeBlackSquare(row, col, source) {
-        if (!this.isValidCell(row, col)) return;
-        
-        const cell = this.grid[row][col];
         const key = `${row},${col}`;
         
         if (source === 'preceding') {
             this.blackPreceding.delete(key);
         } else if (source === 'terminal') {
             this.blackTerminal.delete(key);
-        } else if (source === 'island') {
-            this.blackIsland.delete(key);
+        } else if (source === 'manual') {
+            this.blackManual.delete(key);
         }
         
-        // Only remove if no other source requires this cell to be black
-        if (!this.blackPreceding.has(key) && !this.blackTerminal.has(key) && !this.blackIsland.has(key)) {
-            cell.isBlack = false;
-            cell.blackSource = null;
-            cell.element.classList.remove('black');
+        // If the position is within the grid, update the cell
+        if (this.isValidCell(row, col)) {
+            const cell = this.grid[row][col];
+            // Only remove if no other source requires this cell to be black
+            if (!this.blackPreceding.has(key) && !this.blackTerminal.has(key) && !this.blackManual.has(key)) {
+                cell.isBlack = false;
+                cell.blackSource = null;
+                cell.element.classList.remove('black');
+            }
         }
+        
+        // Log grid state after black square removal
+        // this.logGridState();
+        // this.logGridArray();
     }
     
     canPlaceBlackSquare(row, col) {
-        if (!this.isValidCell(row, col)) return false;
+        if (!this.isValidBlackSquarePosition(row, col)) return false;
         
-        const cell = this.grid[row][col];
-        if (cell.letter) return false; // Can't make a cell with a letter black
+        // If the position is within the grid, check for conflicts
+        if (this.isValidCell(row, col)) {
+            const cell = this.grid[row][col];
+            if (cell.letter) return false; // Can't make a cell with a letter black
+            if (cell.number) return false; // Can't make a cell with a number black
+        }
         
         return true;
     }
     
-    // Detect and fill isolated white squares (islands)
-    detectAndFillIslands() {
-        // Clear previous island black squares
-        this.blackIsland.clear();
-        
-        // Find all white squares
-        const whiteSquares = [];
-        for (let r = 0; r < this.gridSize; r++) {
-            for (let c = 0; c < this.gridSize; c++) {
-                const cell = this.grid[r][c];
-                if (!cell.isBlack && !cell.letter) {
-                    whiteSquares.push({ row: r, col: c });
-                }
-            }
-        }
-        
-        // Find connected components of white squares
-        const visited = new Set();
-        const islands = [];
-        
-        for (const square of whiteSquares) {
-            const key = `${square.row},${square.col}`;
-            if (!visited.has(key)) {
-                const island = this.findConnectedWhiteSquares(square.row, square.col, visited);
-                if (island.length > 0) {
-                    islands.push(island);
-                }
-            }
-        }
-        
-        // Check each island and fill if necessary
-        for (const island of islands) {
-            if (this.shouldFillIsland(island)) {
-                for (const square of island) {
-                    this.setBlackSquare(square.row, square.col, 'island');
-                }
-            }
-        }
-    }
-    
-    // Find all white squares connected to the given square
-    findConnectedWhiteSquares(startRow, startCol, visited) {
-        const island = [];
-        const queue = [{ row: startRow, col: startCol }];
-        
-        while (queue.length > 0) {
-            const current = queue.shift();
-            const key = `${current.row},${current.col}`;
-            
-            if (visited.has(key)) continue;
-            visited.add(key);
-            
-            const cell = this.grid[current.row][current.col];
-            if (cell.isBlack || cell.letter) continue;
-            
-            island.push(current);
-            
-            // Check adjacent squares (up, down, left, right)
-            const directions = [
-                { row: -1, col: 0 }, { row: 1, col: 0 },
-                { row: 0, col: -1 }, { row: 0, col: 1 }
-            ];
-            
-            for (const dir of directions) {
-                const newRow = current.row + dir.row;
-                const newCol = current.col + dir.col;
-                const newKey = `${newRow},${newCol}`;
-                
-                if (this.isValidCell(newRow, newCol) && !visited.has(newKey)) {
-                    const adjacentCell = this.grid[newRow][newCol];
-                    if (!adjacentCell.isBlack && !adjacentCell.letter) {
-                        queue.push({ row: newRow, col: newCol });
-                    }
-                }
-            }
-        }
-        
-        return island;
-    }
-    
-    // Check if an island should be filled (too small or isolated)
-    shouldFillIsland(island) {
-        if (island.length === 0) return false;
-        
-        // Check if island is too small (less than 3 squares)
-        if (island.length < 3) return true;
-        
-        // Check if island is too narrow (less than 3 squares wide or tall)
-        const rows = new Set(island.map(s => s.row));
-        const cols = new Set(island.map(s => s.col));
-        
-        if (rows.size < 3 && cols.size < 3) return true;
-        
-        // Check if island is completely isolated (no adjacent white squares outside island)
-        for (const square of island) {
-            const directions = [
-                { row: -1, col: 0 }, { row: 1, col: 0 },
-                { row: 0, col: -1 }, { row: 0, col: 1 }
-            ];
-            
-            for (const dir of directions) {
-                const newRow = square.row + dir.row;
-                const newCol = square.col + dir.col;
-                
-                if (this.isValidCell(newRow, newCol)) {
-                    const adjacentCell = this.grid[newRow][newCol];
-                    if (!adjacentCell.isBlack && !adjacentCell.letter) {
-                        // Check if this adjacent square is outside the island
-                        const isOutsideIsland = !island.some(s => s.row === newRow && s.col === newCol);
-                        if (isOutsideIsland) {
-                            return false; // Island is not completely isolated
-                        }
-                    }
-                }
-            }
-        }
-        
-        return true; // Island is completely isolated
-    }
+
     
     updateCellBlackState(row, col) {
         if (!this.isValidCell(row, col)) return;
@@ -1414,11 +1982,11 @@ class CrosswordBuilder {
         const cell = this.grid[row][col];
         const key = `${row},${col}`;
         
-        const shouldBeBlack = this.blackPreceding.has(key) || this.blackTerminal.has(key) || this.blackIsland.has(key);
+        const shouldBeBlack = this.blackPreceding.has(key) || this.blackTerminal.has(key);
         
         if (shouldBeBlack && !cell.isBlack) {
             cell.isBlack = true;
-            cell.blackSource = this.blackPreceding.has(key) ? 'preceding' : (this.blackTerminal.has(key) ? 'terminal' : 'island');
+            cell.blackSource = this.blackPreceding.has(key) ? 'preceding' : 'terminal';
             cell.element.classList.add('black');
             cell.element.innerHTML = '';
             cell.letter = null;
@@ -1474,8 +2042,83 @@ class CrosswordBuilder {
         
         // Update number colors
         this.updateNumberColors();
+        
+        // Log grid state after display update
+        this.logGridState();
+        this.logGridArray();
     }
     
+    logGridState() {
+        // Grid state logging removed
+    }
+    
+    logGridArray() {
+        console.log('=== DETAILED GRID STATE ===');
+        
+        // Show grid with actual content
+        let arr = [];
+        for (let row = 0; row < this.gridSize; row++) {
+            let rowArr = [];
+            for (let col = 0; col < this.gridSize; col++) {
+                const cell = this.grid[row][col];
+                let val = '';
+                
+                if (cell.isBlack) {
+                    val = '███'; // Black square
+                } else if (cell.letter) {
+                    val = cell.letter.padEnd(3, ' '); // Letter with padding
+                } else if (cell.number) {
+                    val = cell.number.toString().padEnd(3, ' '); // Number with padding
+                } else {
+                    val = ' . '; // Empty cell
+                }
+                
+                rowArr.push(val);
+            }
+            arr.push(rowArr.join(' '));
+        }
+        
+        console.log('Grid Content:');
+        arr.forEach((line, index) => {
+            console.log(`${index.toString().padStart(2, '0')}: ${line}`);
+        });
+        
+        // Show placed words
+        console.log('\nPlaced Words:');
+        this.placedWords.forEach(word => {
+            console.log(`  ${word.number}${word.direction === 'across' ? 'A' : 'D'}: "${word.word}" at (${word.startRow},${word.startCol})`);
+        });
+        
+        // Show black square sources
+        console.log('\nBlack Squares:');
+        console.log(`  Preceding: ${this.blackPreceding.size} squares`);
+        console.log(`  Terminal: ${this.blackTerminal.size} squares`);
+        console.log(`  Manual: ${this.blackManual.size} squares`);
+        
+        // Show grid size and cell count
+        console.log(`\nGrid Size: ${this.gridSize}x${this.gridSize} (${this.gridSize * this.gridSize} cells)`);
+        console.log('=== END GRID STATE ===\n');
+    }
+    
+    // Debug method to show raw grid array data
+    logRawGridData() {
+        console.log('=== RAW GRID ARRAY DATA ===');
+        for (let row = 0; row < this.gridSize; row++) {
+            for (let col = 0; col < this.gridSize; col++) {
+                const cell = this.grid[row][col];
+                console.log(`[${row},${col}]:`, {
+                    letter: cell.letter,
+                    number: cell.number,
+                    isBlack: cell.isBlack,
+                    blackSource: cell.blackSource,
+                    words: cell.words.length,
+                    hasElement: !!cell.element
+                });
+            }
+        }
+        console.log('=== END RAW DATA ===\n');
+    }
+
     redrawWord(word) {
         // Add number to first cell
         const firstCell = this.grid[word.startRow][word.startCol];
@@ -1653,7 +2296,11 @@ class CrosswordBuilder {
         });
         this.updateNumberColors();
         this.updateClueOnGridStates();
-        // this.detectAndFillIslands(); // Temporarily disabled for debugging
+
+        
+        // Log grid state after placing answer
+        // this.logGridState();
+        // this.logGridArray();
     }
 
     // Helper to update clue visual state for on-grid answers
@@ -1682,8 +2329,136 @@ class CrosswordBuilder {
         });
     }
 
-    // Call updateClueOnGridStates after placing/removing answers and after grid changes
-    // Example: after placeAnswerAt, removeWord, right-click removal, and after grid updates
+    // Helper method to rebuild visual content from grid array
+    rebuildVisualContent() {
+        const gridElement = document.getElementById('crossword-grid');
+        
+        // Clear all visual content
+        for (let row = 0; row < this.gridSize; row++) {
+            for (let col = 0; col < this.gridSize; col++) {
+                const cell = this.grid[row][col];
+                if (cell.element) {
+                    cell.element.innerHTML = '';
+                    cell.element.classList.remove('black');
+                }
+            }
+        }
+        
+        // Rebuild visual content from grid array
+        for (let row = 0; row < this.gridSize; row++) {
+            for (let col = 0; col < this.gridSize; col++) {
+                const cell = this.grid[row][col];
+                if (cell.element) {
+                    if (cell.isBlack) {
+                        cell.element.classList.add('black');
+                    } else {
+                        if (cell.number) {
+                            const numberSpan = document.createElement('span');
+                            numberSpan.className = 'number';
+                            numberSpan.textContent = cell.number;
+                            cell.element.appendChild(numberSpan);
+                        }
+                        
+                        if (cell.letter) {
+                            const letterSpan = document.createElement('span');
+                            letterSpan.className = 'letter';
+                            letterSpan.textContent = cell.letter;
+                            cell.element.appendChild(letterSpan);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Update number colors
+        this.updateNumberColors();
+    }
+
+    // Helper method to completely rebuild the visual grid from grid array
+    rebuildVisualGrid() {
+        const gridElement = document.getElementById('crossword-grid');
+        
+        // Clear all existing DOM elements
+        gridElement.innerHTML = '';
+        
+        // Recreate all DOM elements based on the grid array
+        for (let row = 0; row < this.gridSize; row++) {
+            for (let col = 0; col < this.gridSize; col++) {
+                const cell = this.grid[row][col];
+                
+                // Create a default cell if it doesn't exist
+                if (!cell) {
+                    this.grid[row][col] = {
+                        element: null,
+                        letter: null,
+                        number: null,
+                        isBlack: false,
+                        blackSource: null,
+                        words: []
+                    };
+                }
+                
+                const cellElement = document.createElement('div');
+                cellElement.className = 'cell';
+                cellElement.dataset.row = row;
+                cellElement.dataset.col = col;
+                cellElement.draggable = true;
+                
+                // Add visual content based on grid array data
+                if (cell.isBlack) {
+                    cellElement.classList.add('black');
+                } else {
+                    if (cell.number) {
+                        const numberSpan = document.createElement('span');
+                        numberSpan.className = 'number';
+                        numberSpan.textContent = cell.number;
+                        cellElement.appendChild(numberSpan);
+                    }
+                    
+                    if (cell.letter) {
+                        const letterSpan = document.createElement('span');
+                        letterSpan.className = 'letter';
+                        letterSpan.textContent = cell.letter;
+                        cellElement.appendChild(letterSpan);
+                    }
+                }
+                
+                // Update the grid array to point to the new element
+                this.grid[row][col].element = cellElement;
+                
+                // Add to DOM
+                gridElement.appendChild(cellElement);
+            }
+        }
+        
+        // Update grid template
+        this.updateGridTemplate();
+        
+        // Update number colors
+        this.updateNumberColors();
+    }
+
+    toggleManualBlackSquare(cellElement) {
+        const row = parseInt(cellElement.dataset.row);
+        const col = parseInt(cellElement.dataset.col);
+        const cell = this.grid[row][col];
+        const key = `${row},${col}`;
+        
+        // Check if this cell is currently black due to manual placement
+        const isManuallyBlack = this.blackManual.has(key);
+        
+        if (isManuallyBlack) {
+            // Remove manual black square
+            this.removeBlackSquare(row, col, 'manual');
+        } else {
+            // Check if we can place a black square here
+            if (this.canPlaceBlackSquare(row, col)) {
+                this.setBlackSquare(row, col, 'manual');
+            } else {
+                console.log('Cannot place black square at', row, col, '- cell has letter or number');
+            }
+        }
+    }
 }
 
 // Add a guard to prevent double initialization
